@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { FlameMark } from "./flame-mark";
+import { LogoMark } from "./logo-mark";
 import { Container } from "./container";
 
 export function Footer() {
@@ -9,7 +9,7 @@ export function Footer() {
         <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
           <div className="max-w-sm">
             <div className="flex items-center gap-2 font-mono text-sm">
-              <FlameMark size={16} className="text-[color:var(--color-fg-muted)]" />
+              <LogoMark size={22} className="text-[color:var(--color-fg-muted)]" />
               <span className="font-semibold">flametrench</span>
             </div>
             <p className="mt-3 text-sm leading-relaxed text-[color:var(--color-fg-muted)]">

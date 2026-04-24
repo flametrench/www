@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { FlameMark } from "./flame-mark";
+import { LogoMark } from "./logo-mark";
 import { Container } from "./container";
 
 export function Nav() {
@@ -12,7 +12,7 @@ export function Nav() {
             className="group flex items-center gap-2 font-mono text-sm tracking-tight"
             aria-label="Flametrench home"
           >
-            <FlameMark size={18} className="text-[color:var(--color-fg-muted)] transition-colors group-hover:text-[color:var(--color-fg)]" />
+            <LogoMark size={24} className="text-[color:var(--color-fg)] transition-opacity group-hover:opacity-90" />
             <span className="font-semibold">flametrench</span>
             <span className="rounded border border-[color:var(--color-border)] px-1.5 py-[1px] font-sans text-[10px] uppercase tracking-wider text-[color:var(--color-fg-muted)]">
               v0.1 · draft
