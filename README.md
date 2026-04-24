@@ -32,31 +32,35 @@ app/
     layout.tsx            docs layout with sidebar
     page.tsx              docs index
     ids/page.tsx          renders content/docs/ids.mdx
+    identity/page.tsx     renders content/docs/identity.mdx
+    tenancy/page.tsx      renders content/docs/tenancy.mdx
+    authorization/page.tsx renders content/docs/authorization.mdx
+    conformance/page.tsx  editorial page about the conformance model
 components/               landing + docs UI components
-content/docs/ids.mdx      mirrored from github.com/flametrench/spec/docs/ids.md
-lib/ids/                  vendored copy of @flametrench/ids used by the live demo
+content/docs/*.mdx        mirrored from github.com/flametrench/spec/docs/
+lib/cn.ts                 className utility
 ```
 
-### Keeping `content/docs/ids.mdx` in sync
+### Keeping `content/docs/*.mdx` in sync
 
-The documentation page renders a local copy of the specification file from
-the [`flametrench/spec`](https://github.com/flametrench/spec) repo. When the
-spec changes, update the local copy:
+The documentation pages render local copies of the spec chapters. When the
+spec changes, refresh them from upstream:
 
 ```bash
-curl -L https://raw.githubusercontent.com/flametrench/spec/main/docs/ids.md \
-  -o content/docs/ids.mdx
+for f in ids identity tenancy authorization; do
+  curl -L "https://raw.githubusercontent.com/flametrench/spec/main/docs/$f.md" \
+    -o "content/docs/$f.mdx"
+done
 ```
 
-A CI job that validates the copy is in sync is planned for a later pass.
+A CI job that validates the copies are in sync is planned for a later pass.
 
-### Vendored `@flametrench/ids`
+### The live encoder widget
 
-`lib/ids/` is a verbatim copy of `packages/ids/src/` from
-[`flametrench/node`](https://github.com/flametrench/node). It exists so the
-interactive encoder on the landing page can use the real SDK without waiting
-for the npm package to publish. Once `@flametrench/ids` is on npm, swap the
-vendored copy for the published dependency.
+The landing page's interactive encoder uses the published `@flametrench/ids`
+npm package directly. Previously this site vendored a copy of the SDK source
+at `lib/ids/` while the npm package was pre-publish; that vendoring was
+removed once `@flametrench/ids@0.1.0` landed on npm (2026-04-24).
 
 ## License
 

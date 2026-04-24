@@ -10,7 +10,7 @@ import {
   InvalidIdError,
   InvalidTypeError,
   type IdType,
-} from "@/lib/ids";
+} from "@flametrench/ids";
 import { Container } from "./container";
 
 const REGISTERED_TYPES = Object.keys(TYPES) as IdType[];
