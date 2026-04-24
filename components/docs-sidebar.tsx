@@ -7,7 +7,12 @@ const sections = [
   },
   {
     title: "v0.1 specification",
-    items: [{ label: "Identifiers", href: "/docs/ids" }],
+    items: [
+      { label: "Identifiers", href: "/docs/ids" },
+      { label: "Identity", href: "/docs/identity" },
+      { label: "Tenancy", href: "/docs/tenancy" },
+      { label: "Authorization", href: "/docs/authorization" },
+    ],
   },
 ];
 
