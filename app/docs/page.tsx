@@ -56,6 +56,18 @@ export default function DocsIndex() {
         </li>
       </ul>
 
+      <h2 className="mt-12 text-xl font-semibold">Conformance</h2>
+      <ul className="mt-4 space-y-3 text-sm text-[color:var(--color-fg-muted)]">
+        <li>
+          <Link href="/docs/conformance" className="text-[color:var(--color-accent)] hover:underline">
+            How SDKs are verified
+          </Link>{" "}
+          — language-agnostic JSON fixtures, RFC 2119 conformance levels,
+          drift-checked in CI. How third-party implementations prove they
+          conform to the spec.
+        </li>
+      </ul>
+
       <h2 className="mt-12 text-xl font-semibold">Supporting artifacts</h2>
       <ul className="mt-4 space-y-3 text-sm text-[color:var(--color-fg-muted)]">
         <li>

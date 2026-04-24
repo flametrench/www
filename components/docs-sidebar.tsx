@@ -14,6 +14,10 @@ const sections = [
       { label: "Authorization", href: "/docs/authorization" },
     ],
   },
+  {
+    title: "Conformance",
+    items: [{ label: "How SDKs are verified", href: "/docs/conformance" }],
+  },
 ];
 
 export function DocsSidebar({ currentPath }: { currentPath: string }) {
