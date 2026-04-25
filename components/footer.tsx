@@ -61,6 +61,14 @@ export function Footer() {
               Python SDKs
             </Link>
             <Link
+              href="https://github.com/orgs/flametrench/repositories?q=java"
+              target="_blank"
+              rel="noreferrer"
+              className="text-[color:var(--color-fg-muted)] hover:text-[color:var(--color-fg)]"
+            >
+              Java SDKs
+            </Link>
+            <Link
               href="https://github.com/flametrench"
               target="_blank"
               rel="noreferrer"
