@@ -14,8 +14,7 @@ const milestones: Array<{
     items: [
       "Identity, tenancy, and authorization specification",
       "Cross-SDK conformance suite (10 fixtures, 70+ tests)",
-      "Node, PHP, and Python SDKs at full v0.1 parity",
-      "Java SDK: ids + authz + tenancy shipped; full identity API in progress",
+      "Node, PHP, Python, and Java SDKs at full v0.1 parity",
       "Cross-language Argon2id parity proven across all four SDKs",
       "Postgres reference data model",
     ],

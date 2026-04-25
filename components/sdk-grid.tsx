@@ -34,7 +34,7 @@ const sdks = [
   {
     name: "dev.flametrench (Java)",
     lang: "Java 17+",
-    desc: "ids, authz, tenancy SDKs for Java. Maven Central. Identity hashing primitive shipped; full credential/session API in progress.",
+    desc: "Identity, tenancy, authz, and ids SDKs for Java. Records-based, Maven-published.",
     href: "https://github.com/orgs/flametrench/repositories?q=java",
     status: "v0.1.0",
   },
