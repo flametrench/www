@@ -11,13 +11,6 @@ const sdks = [
     status: "draft",
   },
   {
-    name: "flametrench (PHP)",
-    lang: "PHP 8.3+",
-    desc: "Identity, tenancy, authz, and ids SDKs for PHP. On Packagist.",
-    href: "https://github.com/orgs/flametrench/repositories?q=php",
-    status: "v0.1.0",
-  },
-  {
     name: "@flametrench (Node)",
     lang: "Node 20+",
     desc: "Identity, tenancy, authz, ids, server, and Next.js adapter — pnpm monorepo.",
@@ -25,10 +18,24 @@ const sdks = [
     status: "v0.1.0",
   },
   {
+    name: "flametrench (PHP)",
+    lang: "PHP 8.3+",
+    desc: "Identity, tenancy, authz, and ids SDKs for PHP. On Packagist.",
+    href: "https://github.com/orgs/flametrench/repositories?q=php",
+    status: "v0.1.0",
+  },
+  {
     name: "flametrench (Python)",
     lang: "Python 3.11+",
     desc: "Identity, tenancy, authz, and ids SDKs for Python. snake_case-native.",
     href: "https://github.com/orgs/flametrench/repositories?q=python",
+    status: "v0.1.0",
+  },
+  {
+    name: "dev.flametrench (Java)",
+    lang: "Java 17+",
+    desc: "ids, authz, tenancy SDKs for Java. Maven Central. Identity hashing primitive shipped; full credential/session API in progress.",
+    href: "https://github.com/orgs/flametrench/repositories?q=java",
     status: "v0.1.0",
   },
 ];
@@ -50,7 +57,7 @@ export function SdkGrid() {
           </p>
         </div>
 
-        <div className="mt-12 grid grid-cols-1 gap-px overflow-hidden rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-border)] sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-12 grid grid-cols-1 gap-px overflow-hidden rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-border)] sm:grid-cols-2 lg:grid-cols-5">
           {sdks.map((sdk) => (
             <Link
               key={sdk.name}
