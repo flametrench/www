@@ -67,7 +67,7 @@ export function Hero() {
             <span aria-hidden>·</span>
             <span>Postgres native</span>
             <span aria-hidden>·</span>
-            <span>PHP 8.3+ / Node 20+</span>
+            <span>PHP 8.3+ · Node 20+ · Python 3.11+</span>
             <span aria-hidden>·</span>
             <span>Apache 2.0</span>
             <span aria-hidden>·</span>

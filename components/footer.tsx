@@ -37,12 +37,12 @@ export function Footer() {
               Spec repo
             </Link>
             <Link
-              href="https://github.com/flametrench/ids-php"
+              href="https://github.com/orgs/flametrench/repositories?q=php"
               target="_blank"
               rel="noreferrer"
               className="text-[color:var(--color-fg-muted)] hover:text-[color:var(--color-fg)]"
             >
-              ids-php
+              PHP SDKs
             </Link>
             <Link
               href="https://github.com/flametrench/node"
@@ -50,15 +50,15 @@ export function Footer() {
               rel="noreferrer"
               className="text-[color:var(--color-fg-muted)] hover:text-[color:var(--color-fg)]"
             >
-              node monorepo
+              Node monorepo
             </Link>
             <Link
-              href="https://github.com/flametrench/laravel"
+              href="https://github.com/orgs/flametrench/repositories?q=python"
               target="_blank"
               rel="noreferrer"
               className="text-[color:var(--color-fg-muted)] hover:text-[color:var(--color-fg)]"
             >
-              laravel sdk
+              Python SDKs
             </Link>
             <Link
               href="https://github.com/flametrench"
