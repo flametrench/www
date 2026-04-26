@@ -9,7 +9,8 @@
   --color-border-strong: rgba(255, 255, 255, 0.14);
   --color-fg: #ededed;
   --color-fg-muted: #a3a3a3;
-  --color-fg-faint: #6b6b6b;
+  /* AA target on #0a0a0a: 4.5:1 minimum. #8a8a8a → ~5.0:1. */
+  --color-fg-faint: #8a8a8a;
   --color-accent: #ff6b35;
   --color-accent-2: #f7b733;
 
@@ -29,6 +30,32 @@ body {
 ::selection {
   background: rgba(255, 107, 53, 0.35);
   color: #fff;
+}
+
+/* Global keyboard-focus indicator. Tailwind's reset removes the browser
+   default outline; without this, keyboard navigators see no focus ring. */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Respect users who request reduced motion. The thrust-pulse animation
+   is decorative; pause it and lock to a calm steady state. */
+@media (prefers-reduced-motion: reduce) {
+  .bg-thrust-pulse {
+    animation: none;
+    opacity: 0.92;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Grid background used by the hero */
@@ -114,6 +141,14 @@ code[data-line-numbers] > [data-line]::before {
   margin-right: 1rem;
   text-align: right;
   color: var(--color-fg-faint);
+  /* Decorative — copy-paste and screen readers SHOULD skip the line
+     numbers. user-select hides them from copy; aria-hidden via the
+     speak property hides them from speech synthesis on browsers that
+     respect it; pointer-events:none prevents accidental selection. */
+  user-select: none;
+  -webkit-user-select: none;
+  pointer-events: none;
+  speak: never;
 }
 
 [data-line] {

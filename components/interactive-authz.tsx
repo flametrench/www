@@ -214,7 +214,7 @@ export function InteractiveAuthz() {
                     <button
                       type="button"
                       onClick={() => removeTuple(i)}
-                      className="opacity-0 transition-opacity group-hover:opacity-100 hover:text-[color:var(--color-fg)]"
+                      className="-mr-2 inline-flex h-11 w-11 items-center justify-center rounded text-[color:var(--color-fg-muted)] opacity-60 transition-opacity hover:text-[color:var(--color-fg)] hover:opacity-100 group-hover:opacity-100 sm:opacity-0"
                       aria-label="Remove tuple"
                     >
                       <X size={14} />
@@ -285,8 +285,14 @@ export function InteractiveAuthz() {
               </div>
             </div>
 
-            {/* Result panel */}
+            {/* Result panel — aria-live so screen-reader users hear
+                ALLOWED/DENIED change as they edit the inputs. polite =
+                announce on next idle, atomic = read the whole region as
+                one update (so SR doesn't string-diff and miss the
+                allowed→denied flip when tuples flip in lockstep). */}
             <div
+              aria-live="polite"
+              aria-atomic="true"
               className={`mt-5 rounded-md border px-4 py-3 transition-colors ${
                 result.allowed
                   ? "border-emerald-700/60 bg-emerald-950/30"

@@ -35,6 +35,7 @@ export function DocsSidebar({ currentPath }: { currentPath: string }) {
                 <li key={item.href}>
                   <Link
                     href={item.href}
+                    aria-current={active ? "page" : undefined}
                     className={`block border-l px-3 py-1.5 transition-colors ${
                       active
                         ? "border-[color:var(--color-accent)] text-[color:var(--color-fg)]"

@@ -44,7 +44,7 @@ export function Hero() {
           <div className="mt-10 flex flex-col items-center gap-3 sm:flex-row">
             <Link
               href="/docs/ids"
-              className="group inline-flex items-center gap-2 rounded-md bg-[color:var(--color-accent)] px-5 py-2.5 text-sm font-medium text-black shadow-[0_0_24px_-4px_rgba(255,107,53,0.6)] transition-transform hover:-translate-y-[1px]"
+              className="group inline-flex items-center gap-2 rounded-md bg-[color:var(--color-accent)] px-6 py-3 text-sm font-medium text-black shadow-[0_0_24px_-4px_rgba(255,107,53,0.6)] transition-transform hover:-translate-y-[1px]"
             >
               Read the specification
               <ArrowUpRight
@@ -56,7 +56,7 @@ export function Hero() {
               href="https://github.com/flametrench"
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-2 rounded-md border border-[color:var(--color-border-strong)] bg-[color:var(--color-surface)]/60 px-5 py-2.5 text-sm font-medium text-[color:var(--color-fg)] backdrop-blur transition-colors hover:border-[color:var(--color-fg-faint)]"
+              className="inline-flex items-center gap-2 rounded-md border border-[color:var(--color-border-strong)] bg-[color:var(--color-surface)]/60 px-6 py-3 text-sm font-medium text-[color:var(--color-fg)] backdrop-blur transition-colors hover:border-[color:var(--color-fg-faint)]"
             >
               View on GitHub
             </Link>

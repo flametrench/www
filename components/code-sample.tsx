@@ -367,9 +367,15 @@ export async function CodeSample() {
           </p>
         </div>
 
-        <div className="mt-10 overflow-hidden rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)]">
+        <div
+          className="mt-10 overflow-hidden rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)]"
+          role="radiogroup"
+          aria-label="Code sample language"
+        >
           {/* CSS-only tabs via radio inputs. Class names are inlined per
-              tab so Tailwind's static analysis sees them at build time. */}
+              tab so Tailwind's static analysis sees them at build time.
+              The radiogroup wrapper + sr-only inputs give correct
+              semantics for assistive tech: SRs announce "Node, 1 of 4". */}
           <input
             type="radio"
             name="code-sample-tabs"
@@ -398,24 +404,28 @@ export async function CodeSample() {
 
           <div className="flex items-center gap-1 overflow-x-auto border-b border-[color:var(--color-border)] px-2">
             <label
+              id="tab-node-label"
               htmlFor="tab-node"
               className="cursor-pointer whitespace-nowrap border-b-2 border-transparent px-4 py-3 font-mono text-xs text-[color:var(--color-fg-muted)] transition-colors peer-checked/node:border-[color:var(--color-accent)] peer-checked/node:text-[color:var(--color-fg)]"
             >
               Node · TypeScript
             </label>
             <label
+              id="tab-php-label"
               htmlFor="tab-php"
               className="cursor-pointer whitespace-nowrap border-b-2 border-transparent px-4 py-3 font-mono text-xs text-[color:var(--color-fg-muted)] transition-colors peer-checked/php:border-[color:var(--color-accent)] peer-checked/php:text-[color:var(--color-fg)]"
             >
               PHP
             </label>
             <label
+              id="tab-python-label"
               htmlFor="tab-python"
               className="cursor-pointer whitespace-nowrap border-b-2 border-transparent px-4 py-3 font-mono text-xs text-[color:var(--color-fg-muted)] transition-colors peer-checked/python:border-[color:var(--color-accent)] peer-checked/python:text-[color:var(--color-fg)]"
             >
               Python
             </label>
             <label
+              id="tab-java-label"
               htmlFor="tab-java"
               className="cursor-pointer whitespace-nowrap border-b-2 border-transparent px-4 py-3 font-mono text-xs text-[color:var(--color-fg-muted)] transition-colors peer-checked/java:border-[color:var(--color-accent)] peer-checked/java:text-[color:var(--color-fg)]"
             >
@@ -426,7 +436,7 @@ export async function CodeSample() {
           <div className="grid">
             <div
               className="col-start-1 row-start-1 hidden peer-checked/node:block"
-              aria-hidden={false}
+              aria-labelledby="tab-node-label"
             >
               <div className="border-b border-[color:var(--color-border)] bg-[color:var(--color-surface-2)]/50 px-4 py-2 font-mono text-xs text-[color:var(--color-fg-muted)]">
                 Install
@@ -443,7 +453,7 @@ export async function CodeSample() {
             </div>
             <div
               className="col-start-1 row-start-1 hidden peer-checked/php:block"
-              aria-hidden={false}
+              aria-labelledby="tab-php-label"
             >
               <div className="border-b border-[color:var(--color-border)] bg-[color:var(--color-surface-2)]/50 px-4 py-2 font-mono text-xs text-[color:var(--color-fg-muted)]">
                 Install
@@ -460,7 +470,7 @@ export async function CodeSample() {
             </div>
             <div
               className="col-start-1 row-start-1 hidden peer-checked/python:block"
-              aria-hidden={false}
+              aria-labelledby="tab-python-label"
             >
               <div className="border-b border-[color:var(--color-border)] bg-[color:var(--color-surface-2)]/50 px-4 py-2 font-mono text-xs text-[color:var(--color-fg-muted)]">
                 Install
@@ -477,7 +487,7 @@ export async function CodeSample() {
             </div>
             <div
               className="col-start-1 row-start-1 hidden peer-checked/java:block"
-              aria-hidden={false}
+              aria-labelledby="tab-java-label"
             >
               <div className="border-b border-[color:var(--color-border)] bg-[color:var(--color-surface-2)]/50 px-4 py-2 font-mono text-xs text-[color:var(--color-fg-muted)]">
                 Install
