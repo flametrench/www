@@ -35,10 +35,10 @@ const ROWS: Row[] = [
     pkg: "identity",
     blurb: "Users, credentials, sessions, MFA.",
     cells: {
-      node: { version: "v0.2.0-rc.4", channel: "live" },
-      php: { version: "v0.2.0-rc.4", channel: "live" },
-      python: { version: "v0.2.0rc4", channel: "pending" },
-      java: { version: "v0.2.0-rc.4", channel: "pending" },
+      node: { version: "v0.2.0-rc.5", channel: "live" },
+      php: { version: "v0.2.0-rc.5", channel: "live" },
+      python: { version: "v0.2.0rc5", channel: "pending" },
+      java: { version: "v0.2.0-rc.5", channel: "pending" },
     },
   },
   {
