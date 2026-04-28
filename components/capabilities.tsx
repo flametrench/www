@@ -5,9 +5,9 @@ const capabilities = [
   {
     icon: Fingerprint,
     name: "Identity",
-    pitch: "Users, sessions, credentials.",
-    body: "Password, passkey, and OIDC flows behind a single interface. Session rotation and credential revocation as first-class operations — not bolt-ons.",
-    prefixes: ["usr", "ses", "cred"],
+    pitch: "Users, sessions, credentials, MFA.",
+    body: "Password, passkey, and OIDC flows behind a single interface. Session rotation and credential revocation as first-class operations — not bolt-ons. v0.2 adds TOTP and WebAuthn (ES256 / RS256 / EdDSA) as first-class factors.",
+    prefixes: ["usr", "ses", "cred", "mfa"],
   },
   {
     icon: Building2,
@@ -20,8 +20,8 @@ const capabilities = [
     icon: ShieldCheck,
     name: "Authorization",
     pitch: "Relational tuples, evaluated at the edge.",
-    body: "Subject–relation–object tuples. No rule languages to learn. Check permissions with a predicate call that translates cleanly to a single SQL index seek.",
-    prefixes: ["tup"],
+    body: "Subject–relation–object tuples. No rule languages to learn. Check permissions with a predicate call that translates cleanly to a single SQL index seek. v0.2 adds optional rewrite rules and time-bounded share tokens.",
+    prefixes: ["tup", "shr"],
   },
 ];
 
@@ -31,7 +31,7 @@ export function Capabilities() {
       <Container>
         <div className="max-w-2xl">
           <p className="font-mono text-xs uppercase tracking-wider text-[color:var(--color-accent)]">
-            What v0.1 covers
+            What's covered
           </p>
           <h2 className="mt-2 text-balance text-3xl font-semibold tracking-tight md:text-4xl">
             Three concerns, one contract.

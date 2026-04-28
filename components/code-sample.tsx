@@ -287,12 +287,12 @@ const INSTALL_JAVA = `<!-- pom.xml -->
 <dependency>
   <groupId>dev.flametrench</groupId>
   <artifactId>identity</artifactId>
-  <version>0.1.0</version>
+  <version>0.2.0-rc.4</version>
 </dependency>
 <dependency>
   <groupId>dev.flametrench</groupId>
   <artifactId>tenancy</artifactId>
-  <version>0.1.0</version>
+  <version>0.2.0-rc.5</version>
 </dependency>`;
 
 async function highlight(

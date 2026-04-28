@@ -6,7 +6,7 @@ const sections = [
     items: [{ label: "Overview", href: "/docs" }],
   },
   {
-    title: "v0.1 specification",
+    title: "Specification",
     items: [
       { label: "Identifiers", href: "/docs/ids" },
       { label: "Identity", href: "/docs/identity" },

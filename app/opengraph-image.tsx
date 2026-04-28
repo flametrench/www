@@ -53,7 +53,7 @@ export default async function OpengraphImage() {
               marginLeft: 8,
             }}
           >
-            v0.1 · draft
+            v0.2 · RC
           </div>
         </div>
 
@@ -109,7 +109,7 @@ export default async function OpengraphImage() {
           <div style={{ display: "flex" }}>·</div>
           <div style={{ display: "flex" }}>Postgres native</div>
           <div style={{ display: "flex" }}>·</div>
-          <div style={{ display: "flex" }}>PHP · Node</div>
+          <div style={{ display: "flex" }}>Node · PHP · Python · Java</div>
           <div style={{ display: "flex" }}>·</div>
           <div style={{ display: "flex" }}>Apache 2.0</div>
         </div>

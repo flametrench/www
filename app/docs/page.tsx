@@ -13,7 +13,7 @@ export default function DocsIndex() {
         Documentation
       </p>
       <h1 className="mt-2 text-4xl font-semibold tracking-tight">
-        Flametrench v0.1 (draft)
+        Flametrench v0.2 (release candidate)
       </h1>
       <p className="mt-5 text-[color:var(--color-fg-muted)]">
         This is the documentation for the Flametrench specification and the
@@ -79,7 +79,7 @@ export default function DocsIndex() {
           >
             Architecture Decision Records
           </Link>{" "}
-          — the why behind every load-bearing choice in v0.1.
+          — the why behind every load-bearing choice across v0.1 and v0.2.
         </li>
         <li>
           <Link
@@ -90,7 +90,7 @@ export default function DocsIndex() {
           >
             Reference Postgres schema
           </Link>{" "}
-          — non-normative DDL that encodes the v0.1 data model.
+          — non-normative DDL that encodes the current data model (v0.1 + v0.2).
         </li>
         <li>
           <Link
@@ -99,19 +99,29 @@ export default function DocsIndex() {
             target="_blank"
             rel="noreferrer"
           >
-            OpenAPI v0.1 draft
+            OpenAPI specification
           </Link>{" "}
           — the HTTP contract every conforming server exposes.
         </li>
       </ul>
 
-      <h2 className="mt-12 text-xl font-semibold">Coming in v0.2+</h2>
+      <h2 className="mt-12 text-xl font-semibold">In v0.2 (release candidate)</h2>
       <ul className="mt-4 space-y-2 text-sm text-[color:var(--color-fg-muted)]">
-        <li>Rewrite rules for authorization (role hierarchy, parent-child inheritance, group expansion).</li>
-        <li>Nested organizations.</li>
-        <li>First-class multi-factor authentication.</li>
+        <li>Authorization rewrite rules — <code>computed_userset</code> (role implication) and <code>tuple_to_userset</code> (parent-child inheritance), with depth/fan-out caps and direct-match short-circuit.</li>
+        <li>Multi-factor authentication — TOTP (RFC 6238), recovery codes, and WebAuthn assertion verification across ES256 / RS256 / EdDSA.</li>
+        <li>Share tokens (<code>shr_</code>) — time-bounded, presentation-bearer access to a single resource without minting an authenticated principal.</li>
+        <li>Postgres-backed reference adapters — <code>PostgresIdentityStore</code>, <code>PostgresTenancyStore</code>, <code>PostgresTupleStore</code>, <code>PostgresShareStore</code> across all four SDKs.</li>
+        <li>Organization metadata (name + slug) and invitation acceptance binding (security).</li>
+      </ul>
+
+      <h2 className="mt-12 text-xl font-semibold">Coming in v0.3+</h2>
+      <ul className="mt-4 space-y-2 text-sm text-[color:var(--color-fg-muted)]">
+        <li>Admin UI reference implementation.</li>
+        <li>Audit events (<code>aud_</code>), notifications (<code>not_</code>), file metadata (<code>file_</code>).</li>
+        <li>Feature flags (<code>flag_</code>) and billing hooks (<code>sub_</code>).</li>
         <li>Magic-link and SAML credential types.</li>
-        <li>Audit events, notifications, files, feature flags, billing hooks.</li>
+        <li>Nested organizations.</li>
+        <li>Additional language SDKs as adopter demand emerges.</li>
       </ul>
 
       <p className="mt-12 text-sm text-[color:var(--color-fg-faint)]">

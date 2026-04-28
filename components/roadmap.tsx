@@ -9,7 +9,7 @@ const milestones: Array<{
 }> = [
   {
     version: "v0.1",
-    status: "in-progress",
+    status: "shipped",
     title: "Contract-first foundations",
     items: [
       "Identity, tenancy, and authorization specification",
@@ -21,14 +21,14 @@ const milestones: Array<{
   },
   {
     version: "v0.2",
-    status: "planned",
+    status: "in-progress",
     title: "Operational surface",
     items: [
-      "Rewrite rules for authz",
-      "MFA + WebAuthn assertion verification",
-      "Audit events (aud_…)",
-      "Notifications (not_…)",
-      "Files (file_…)",
+      "Authorization rewrite rules (computed_userset, tuple_to_userset)",
+      "Multi-factor authentication — TOTP + WebAuthn (ES256/RS256/EdDSA)",
+      "Share tokens (shr_) for time-bounded resource access",
+      "Postgres-backed reference adapters across all 4 SDKs",
+      "Organization metadata (name + slug) and invitation acceptance binding",
     ],
   },
   {
@@ -37,9 +37,10 @@ const milestones: Array<{
     title: "Platform breadth",
     items: [
       "Admin UI reference implementation",
-      "Laravel SDK (flametrench/laravel)",
-      "Feature flags (flag_…) and billing hooks (sub_…)",
-      "Additional language SDKs",
+      "Audit events (aud_) and notifications (not_)",
+      "File metadata primitive (file_)",
+      "Feature flags (flag_) and billing hooks (sub_)",
+      "Additional language SDKs as adopter demand emerges",
     ],
   },
 ];
@@ -51,7 +52,7 @@ const STATUS_META = {
     color: "text-emerald-400",
   },
   "in-progress": {
-    label: "In progress",
+    label: "Release candidate",
     icon: CircleDashed,
     color: "text-[color:var(--color-accent)]",
   },
