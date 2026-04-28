@@ -204,13 +204,11 @@ export function StatusMatrix() {
           <span className="inline-flex items-center gap-1">
             <CheckCircle2 size={12} className="text-emerald-400" /> Live
           </span>{" "}
-          — published to the language&rsquo;s registry, installable today.{" "}
+          — installable today.
           <span className="ml-3 inline-flex items-center gap-1">
             <Clock size={12} className="text-amber-400" /> Pending
           </span>{" "}
-          — built and validated locally; awaiting external account /
-          credential bootstrap to publish (PyPI org approval, Maven Central
-          Sonatype Portal).
+          — publishing soon.
         </p>
 
         <div className="mt-8 flex flex-wrap gap-3 text-sm">
