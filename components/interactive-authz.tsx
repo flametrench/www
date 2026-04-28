@@ -5,15 +5,15 @@ import { CheckCircle2, XCircle, Plus, X } from "lucide-react";
 import { Container } from "./container";
 
 // Educational interactive: a live authz check() against an in-memory
-// tuple store. Pre-populated to demonstrate the v0.1 no-derivation
+// tuple store. Pre-populated to demonstrate the default exact-match
 // invariant — admin doesn't imply editor, org membership doesn't imply
 // project access, etc. Most authz libraries silently allow these
-// inferences; Flametrench rejects them at the API boundary.
+// inferences; Flametrench rejects them at the API boundary unless an
+// adopter explicitly opts into v0.2 rewrite rules (ADR 0007).
 //
 // The widget reimplements the authz primitive in ~20 lines because the
 // full SDK pulls in node:crypto for tup_ id generation. The semantics
-// here match @flametrench/authz exactly: exact-match on the 5-tuple
-// natural key, no inference.
+// here match @flametrench/authz's default exact-match path exactly.
 
 type Tuple = {
   subjectId: string;
@@ -78,7 +78,7 @@ const PRESETS: PresetQuery[] = [
     objectId: "42",
     expectedAllowed: false,
     takeaway:
-      "Alice has editor on proj_42, but editor does NOT imply viewer in v0.1. No role implication.",
+      "Alice has editor on proj_42, but editor does NOT imply viewer by default. v0.2 lets adopters add a `viewer ⊆ editor` rewrite rule explicitly.",
   },
   {
     subject: "bob",
@@ -87,7 +87,7 @@ const PRESETS: PresetQuery[] = [
     objectId: "acme",
     expectedAllowed: false,
     takeaway:
-      "Bob is admin on org_acme. Admin does NOT imply editor. v0.1 has no role-implication graph.",
+      "Bob is admin on org_acme. Admin does NOT imply editor by default. There's no role-implication graph until an adopter declares one.",
   },
   {
     subject: "carol",
@@ -168,10 +168,11 @@ export function InteractiveAuthz() {
             <span className="font-mono text-[color:var(--color-fg)]">admin</span>{" "}
             imply{" "}
             <span className="font-mono text-[color:var(--color-fg)]">editor</span>{" "}
-            and let org membership imply project access. Flametrench v0.1
-            doesn&rsquo;t. Every check is exact-match on the 5-tuple natural
-            key. Click a preset query to see what passes — and what
-            doesn&rsquo;t.
+            and let org membership imply project access. Flametrench
+            doesn&rsquo;t — by default. Every check is exact-match on the
+            5-tuple natural key. v0.2 adds optional rewrite rules for adopters
+            who want role hierarchies, but you opt in, not out. Click a preset
+            query to see what passes — and what doesn&rsquo;t.
           </p>
         </div>
 
@@ -400,6 +401,22 @@ export function InteractiveAuthz() {
             All six queries run the same check() primitive against the same
             store. The outcome depends only on whether an exact-match tuple
             exists — not on roles you might assume are equivalent.
+          </p>
+          <p className="mt-3 text-xs text-[color:var(--color-fg-muted)]">
+            Want role hierarchies?{" "}
+            <a
+              href="https://github.com/flametrench/spec/blob/main/decisions/0007-rewrite-rules.md"
+              target="_blank"
+              rel="noreferrer"
+              className="text-[color:var(--color-accent)] hover:underline"
+            >
+              v0.2 rewrite rules (ADR 0007)
+            </a>{" "}
+            let adopters declare{" "}
+            <span className="font-mono text-[color:var(--color-fg)]">computed_userset</span>
+            {" "}(role implication) and{" "}
+            <span className="font-mono text-[color:var(--color-fg)]">tuple_to_userset</span>
+            {" "}(parent-child inheritance) explicitly, with depth and fan-out caps.
           </p>
         </div>
       </Container>
