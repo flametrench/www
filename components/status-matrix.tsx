@@ -7,12 +7,16 @@ import { Container } from "./container";
 // answer to "is this real, in my language, on my registry?" — not
 // just "what languages does this support".
 //
-// EACH CELL'S VERSION REFLECTS WHAT'S ACTUALLY ON THE REGISTRY.
-// "live" = installable today via the named registry. "pending" =
-// shipped locally but not yet on the registry (org / credential
-// approvals in progress for PyPI and Maven Central; npm publishing
-// catch-up is in flight). Always verify with `npm view`,
-// `pip index versions`, etc. before depending on a specific version.
+// EACH CELL'S VERSION REFLECTS THE NEWEST VERSION ACTUALLY PUBLISHED
+// ON THE NAMED REGISTRY (any dist-tag — `latest` OR `rc`). "live" =
+// installable today via `npm install @flametrench/<pkg>@<version>`,
+// `composer require flametrench/<pkg>:<version>`, etc. "pending" =
+// shipped locally but not yet on the registry. Verify with
+// `npm view @flametrench/<pkg> versions --json` (note the plural —
+// singular `version` returns only the `latest` dist-tag, missing
+// RCs published under `rc` / `next`). PHP/Packagist auto-syncs
+// from git tags. PyPI/Maven publishing blocked on org/credential
+// approvals.
 
 type ChannelState = "live" | "pending" | "planned";
 
@@ -32,7 +36,7 @@ const ROWS: Row[] = [
     pkg: "ids",
     blurb: "Wire-format identifiers (UUIDv7, prefixed).",
     cells: {
-      node: { version: "v0.1.0", channel: "live" },
+      node: { version: "v0.2.0-rc.2", channel: "live" },
       php: { version: "v0.2.0-rc.2", channel: "live" },
       python: { version: "v0.2.0rc3", channel: "pending" },
       java: { version: "v0.2.0-rc.2", channel: "pending" },
@@ -52,7 +56,7 @@ const ROWS: Row[] = [
     pkg: "tenancy",
     blurb: "Organizations, memberships, invitations.",
     cells: {
-      node: { version: "v0.2.0-rc.3", channel: "live" },
+      node: { version: "v0.2.0-rc.4", channel: "live" },
       php: { version: "v0.2.0-rc.6", channel: "live" },
       python: { version: "v0.2.0rc5", channel: "pending" },
       java: { version: "v0.2.0-rc.5", channel: "pending" },
