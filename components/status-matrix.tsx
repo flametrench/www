@@ -46,7 +46,7 @@ const ROWS: Row[] = [
     pkg: "identity",
     blurb: "Users, credentials, sessions, MFA, display name, listUsers.",
     cells: {
-      node: { version: "v0.2.0-rc.4", channel: "live" },
+      node: { version: "v0.2.0-rc.7", channel: "live" },
       php: { version: "v0.2.0-rc.6", channel: "live" },
       python: { version: "v0.2.0rc6", channel: "pending" },
       java: { version: "v0.2.0-rc.6", channel: "pending" },
