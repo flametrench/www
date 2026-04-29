@@ -6,6 +6,13 @@ import { Container } from "./container";
 // Replaces the SDK-grid framing because adopters want the precise
 // answer to "is this real, in my language, on my registry?" — not
 // just "what languages does this support".
+//
+// EACH CELL'S VERSION REFLECTS WHAT'S ACTUALLY ON THE REGISTRY.
+// "live" = installable today via the named registry. "pending" =
+// shipped locally but not yet on the registry (org / credential
+// approvals in progress for PyPI and Maven Central; npm publishing
+// catch-up is in flight). Always verify with `npm view`,
+// `pip index versions`, etc. before depending on a specific version.
 
 type ChannelState = "live" | "pending" | "planned";
 
@@ -25,7 +32,7 @@ const ROWS: Row[] = [
     pkg: "ids",
     blurb: "Wire-format identifiers (UUIDv7, prefixed).",
     cells: {
-      node: { version: "v0.2.0-rc.2", channel: "live" },
+      node: { version: "v0.1.0", channel: "live" },
       php: { version: "v0.2.0-rc.2", channel: "live" },
       python: { version: "v0.2.0rc3", channel: "pending" },
       java: { version: "v0.2.0-rc.2", channel: "pending" },
@@ -33,20 +40,20 @@ const ROWS: Row[] = [
   },
   {
     pkg: "identity",
-    blurb: "Users, credentials, sessions, MFA.",
+    blurb: "Users, credentials, sessions, MFA, display name, listUsers.",
     cells: {
-      node: { version: "v0.2.0-rc.5", channel: "live" },
-      php: { version: "v0.2.0-rc.5", channel: "live" },
-      python: { version: "v0.2.0rc5", channel: "pending" },
-      java: { version: "v0.2.0-rc.5", channel: "pending" },
+      node: { version: "v0.2.0-rc.4", channel: "live" },
+      php: { version: "v0.2.0-rc.6", channel: "live" },
+      python: { version: "v0.2.0rc6", channel: "pending" },
+      java: { version: "v0.2.0-rc.6", channel: "pending" },
     },
   },
   {
     pkg: "tenancy",
     blurb: "Organizations, memberships, invitations.",
     cells: {
-      node: { version: "v0.2.0-rc.5", channel: "live" },
-      php: { version: "v0.2.0-rc.5", channel: "live" },
+      node: { version: "v0.2.0-rc.3", channel: "live" },
+      php: { version: "v0.2.0-rc.6", channel: "live" },
       python: { version: "v0.2.0rc5", channel: "pending" },
       java: { version: "v0.2.0-rc.5", channel: "pending" },
     },
@@ -55,8 +62,8 @@ const ROWS: Row[] = [
     pkg: "authz",
     blurb: "Tuples, check(), rewrite rules, share tokens.",
     cells: {
-      node: { version: "v0.2.0-rc.4", channel: "live" },
-      php: { version: "v0.2.0-rc.4", channel: "live" },
+      node: { version: "v0.2.0-rc.3", channel: "live" },
+      php: { version: "v0.2.0-rc.5", channel: "live" },
       python: { version: "v0.2.0rc4", channel: "pending" },
       java: { version: "v0.2.0-rc.4", channel: "pending" },
     },

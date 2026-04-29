@@ -287,7 +287,7 @@ const INSTALL_JAVA = `<!-- pom.xml -->
 <dependency>
   <groupId>dev.flametrench</groupId>
   <artifactId>identity</artifactId>
-  <version>0.2.0-rc.4</version>
+  <version>0.2.0-rc.6</version>
 </dependency>
 <dependency>
   <groupId>dev.flametrench</groupId>
