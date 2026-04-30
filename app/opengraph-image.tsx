@@ -53,7 +53,7 @@ export default async function OpengraphImage() {
               marginLeft: 8,
             }}
           >
-            v0.2 · RC
+            v0.2 · stable
           </div>
         </div>
 
