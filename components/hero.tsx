@@ -21,7 +21,7 @@ export function Hero() {
         <div className="relative flex flex-col items-center justify-center py-28 text-center md:py-40">
           <div className="inline-flex items-center gap-2 rounded-full border border-[color:var(--color-border)] bg-[color:var(--color-surface)]/60 px-3 py-1 font-mono text-[11px] uppercase tracking-wider text-[color:var(--color-fg-muted)] backdrop-blur">
             <span className="h-1.5 w-1.5 rounded-full bg-[color:var(--color-accent)] shadow-[0_0_12px_2px_rgba(255,107,53,0.6)]" />
-            Flametrench v0.2 · release candidate
+            Flametrench v0.2 · stable
           </div>
 
           <h1 className="mt-8 max-w-3xl text-balance text-4xl font-semibold leading-[1.05] tracking-tight text-[color:var(--color-fg)] md:text-6xl lg:text-7xl">

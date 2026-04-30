@@ -13,7 +13,7 @@ export default function DocsIndex() {
         Documentation
       </p>
       <h1 className="mt-2 text-4xl font-semibold tracking-tight">
-        Flametrench v0.2 (release candidate)
+        Flametrench v0.2
       </h1>
       <p className="mt-5 text-[color:var(--color-fg-muted)]">
         This is the documentation for the Flametrench specification and the
@@ -105,7 +105,7 @@ export default function DocsIndex() {
         </li>
       </ul>
 
-      <h2 className="mt-12 text-xl font-semibold">In v0.2 (release candidate)</h2>
+      <h2 className="mt-12 text-xl font-semibold">In v0.2</h2>
       <ul className="mt-4 space-y-2 text-sm text-[color:var(--color-fg-muted)]">
         <li>Authorization rewrite rules — <code>computed_userset</code> (role implication) and <code>tuple_to_userset</code> (parent-child inheritance), with depth/fan-out caps and direct-match short-circuit.</li>
         <li>Multi-factor authentication — TOTP (RFC 6238), recovery codes, and WebAuthn assertion verification across ES256 / RS256 / EdDSA.</li>

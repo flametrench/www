@@ -36,40 +36,40 @@ const ROWS: Row[] = [
     pkg: "ids",
     blurb: "Wire-format identifiers (UUIDv7, prefixed).",
     cells: {
-      node: { version: "v0.2.0-rc.2", channel: "live" },
-      php: { version: "v0.2.0-rc.2", channel: "live" },
-      python: { version: "v0.2.0rc3", channel: "pending" },
-      java: { version: "v0.2.0-rc.2", channel: "pending" },
+      node: { version: "v0.2.0", channel: "live" },
+      php: { version: "v0.2.0", channel: "live" },
+      python: { version: "v0.2.0", channel: "pending" },
+      java: { version: "v0.2.0", channel: "pending" },
     },
   },
   {
     pkg: "identity",
     blurb: "Users, credentials, sessions, MFA, display name, listUsers.",
     cells: {
-      node: { version: "v0.2.0-rc.7", channel: "live" },
-      php: { version: "v0.2.0-rc.6", channel: "live" },
-      python: { version: "v0.2.0rc6", channel: "pending" },
-      java: { version: "v0.2.0-rc.6", channel: "pending" },
+      node: { version: "v0.2.0", channel: "live" },
+      php: { version: "v0.2.0", channel: "live" },
+      python: { version: "v0.2.0", channel: "pending" },
+      java: { version: "v0.2.0", channel: "pending" },
     },
   },
   {
     pkg: "tenancy",
     blurb: "Organizations, memberships, invitations.",
     cells: {
-      node: { version: "v0.2.0-rc.6", channel: "live" },
-      php: { version: "v0.2.0-rc.6", channel: "live" },
-      python: { version: "v0.2.0rc6", channel: "pending" },
-      java: { version: "v0.2.0-rc.6", channel: "pending" },
+      node: { version: "v0.2.0", channel: "live" },
+      php: { version: "v0.2.0", channel: "live" },
+      python: { version: "v0.2.0", channel: "pending" },
+      java: { version: "v0.2.0", channel: "pending" },
     },
   },
   {
     pkg: "authz",
     blurb: "Tuples, check(), rewrite rules, share tokens.",
     cells: {
-      node: { version: "v0.2.0-rc.5", channel: "live" },
-      php: { version: "v0.2.0-rc.5", channel: "live" },
-      python: { version: "v0.2.0rc5", channel: "pending" },
-      java: { version: "v0.2.0-rc.5", channel: "pending" },
+      node: { version: "v0.2.0", channel: "live" },
+      php: { version: "v0.2.0", channel: "live" },
+      python: { version: "v0.2.0", channel: "pending" },
+      java: { version: "v0.2.0", channel: "pending" },
     },
   },
 ];
@@ -147,9 +147,9 @@ export function StatusMatrix() {
             Package × language × registry.
           </h2>
           <p className="mt-4 text-[color:var(--color-fg-muted)]">
-            v0.2 release-candidate. All four core packages, all four
-            languages — same semantics, conformance-tested across the family.
-            Registry channels light up as each is published.
+            v0.2 stable. All four core packages, all four languages — same
+            semantics, conformance-tested across the family. Registry channels
+            light up as each is published.
           </p>
         </div>
 
