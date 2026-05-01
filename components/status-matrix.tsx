@@ -46,7 +46,7 @@ const ROWS: Row[] = [
     pkg: "identity",
     blurb: "Users, credentials, sessions, MFA, display name, listUsers.",
     cells: {
-      node: { version: "v0.2.0", channel: "live" },
+      node: { version: "v0.2.1", channel: "live" },
       php: { version: "v0.2.0", channel: "live" },
       python: { version: "v0.2.0", channel: "pending" },
       java: { version: "v0.2.0", channel: "pending" },
@@ -56,7 +56,7 @@ const ROWS: Row[] = [
     pkg: "tenancy",
     blurb: "Organizations, memberships, invitations.",
     cells: {
-      node: { version: "v0.2.0", channel: "live" },
+      node: { version: "v0.2.1", channel: "live" },
       php: { version: "v0.2.0", channel: "live" },
       python: { version: "v0.2.0", channel: "pending" },
       java: { version: "v0.2.0", channel: "pending" },
@@ -66,7 +66,7 @@ const ROWS: Row[] = [
     pkg: "authz",
     blurb: "Tuples, check(), rewrite rules, share tokens.",
     cells: {
-      node: { version: "v0.2.0", channel: "live" },
+      node: { version: "v0.2.1", channel: "live" },
       php: { version: "v0.2.0", channel: "live" },
       python: { version: "v0.2.0", channel: "pending" },
       java: { version: "v0.2.0", channel: "pending" },
