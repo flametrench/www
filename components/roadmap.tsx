@@ -21,14 +21,15 @@ const milestones: Array<{
   },
   {
     version: "v0.2",
-    status: "in-progress",
+    status: "shipped",
     title: "Operational surface",
     items: [
       "Authorization rewrite rules (computed_userset, tuple_to_userset)",
       "Multi-factor authentication — TOTP + WebAuthn (ES256/RS256/EdDSA)",
       "Share tokens (shr_) for time-bounded resource access",
-      "Postgres-backed reference adapters across all 4 SDKs",
-      "Organization metadata (name + slug) and invitation acceptance binding",
+      "Postgres-backed reference adapters across all 4 SDKs, with caller-owned transaction cooperation (ADR 0013)",
+      "User display_name + listUsers; organization name + slug; invitation acceptance binding",
+      "Threat model and 27-fixture conformance corpus across all four SDK families",
     ],
   },
   {
@@ -36,7 +37,7 @@ const milestones: Array<{
     status: "planned",
     title: "Platform breadth",
     items: [
-      "Admin UI reference implementation",
+      "Admin UI reference implementation + first-party demo apps per SDK",
       "Audit events (aud_) and notifications (not_)",
       "File metadata primitive (file_)",
       "Feature flags (flag_) and billing hooks (sub_)",
@@ -52,7 +53,7 @@ const STATUS_META = {
     color: "text-emerald-400",
   },
   "in-progress": {
-    label: "Release candidate",
+    label: "In progress",
     icon: CircleDashed,
     color: "text-[color:var(--color-accent)]",
   },
