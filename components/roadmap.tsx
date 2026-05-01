@@ -33,11 +33,12 @@ const milestones: Array<{
     ],
   },
   {
-    version: "v0.3+",
-    status: "planned",
+    version: "v0.3",
+    status: "in-progress",
     title: "Platform breadth",
     items: [
-      "Admin UI reference implementation + first-party demo apps per SDK",
+      "First-party demo apps showing v0.2 in real flows",
+      "Admin UI reference implementation",
       "Audit events (aud_) and notifications (not_)",
       "File metadata primitive (file_)",
       "Feature flags (flag_) and billing hooks (sub_)",
