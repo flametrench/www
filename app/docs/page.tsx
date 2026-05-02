@@ -114,11 +114,20 @@ export default function DocsIndex() {
         <li>Organization metadata (name + slug) and invitation acceptance binding (security).</li>
       </ul>
 
-      <h2 className="mt-12 text-xl font-semibold">Coming in v0.3+</h2>
+      <h2 className="mt-12 text-xl font-semibold">In v0.3 (in development)</h2>
       <ul className="mt-4 space-y-2 text-sm text-[color:var(--color-fg-muted)]">
-        <li>Admin UI reference implementation.</li>
+        <li>Personal access tokens (<code>pat_</code>) — non-interactive bearer credentials for CLI / CI / server-to-server (ADR 0016).</li>
+        <li>Bearer prefix dispatch — sessions / share tokens / PATs unified behind one <code>auth.kind</code> classifier.</li>
+        <li>Postgres rewrite-rule evaluation — <code>PostgresTupleStore.check()</code> with rules; no in-memory shadow workaround required (ADR 0017).</li>
+        <li>WebAuthn EdDSA + RS256 conformance fixture set (the v0.2-deferred parity set).</li>
+        <li>Schema relaxation: <code>tup.subject_type ^[a-z]{`{2,6}`}$</code> unblocks <code>tuple_to_userset</code> object-to-object hops.</li>
+      </ul>
+
+      <h2 className="mt-12 text-xl font-semibold">Coming in v0.4+</h2>
+      <ul className="mt-4 space-y-2 text-sm text-[color:var(--color-fg-muted)]">
         <li>Audit events (<code>aud_</code>), notifications (<code>not_</code>), file metadata (<code>file_</code>).</li>
         <li>Feature flags (<code>flag_</code>) and billing hooks (<code>sub_</code>).</li>
+        <li>Group-as-subject (<code>grp_</code>) and rewrite-rule intersection / exclusion / recursive closures.</li>
         <li>Magic-link and SAML credential types.</li>
         <li>Nested organizations.</li>
         <li>Additional language SDKs as adopter demand emerges.</li>

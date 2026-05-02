@@ -35,13 +35,25 @@ const milestones: Array<{
   {
     version: "v0.3",
     status: "in-progress",
-    title: "Platform breadth",
+    title: "Bearer surface + Postgres rule eval",
     items: [
-      "First-party demo apps showing v0.2 in real flows",
-      "Admin UI reference implementation",
-      "Audit events (aud_) and notifications (not_)",
-      "File metadata primitive (file_)",
+      "Personal access tokens (pat_) — non-interactive bearer credentials for CLI / CI / server-to-server (ADR 0016)",
+      "Bearer prefix dispatch — sessions / share tokens / PATs unified behind one auth.kind classifier",
+      "Postgres rewrite-rule evaluation — PostgresTupleStore.check() with rules, no in-memory shadow workaround (ADR 0017)",
+      "WebAuthn EdDSA + RS256 conformance fixture set (the v0.2-deferred parity set)",
+      "Schema relaxation: tup.subject_type ^[a-z]{2,6}$ unblocks tuple_to_userset object-to-object hops",
+      "Hearth — first-party customer-support inbox demo app (v0.3.1 follow-up)",
+    ],
+  },
+  {
+    version: "v0.4+",
+    status: "planned",
+    title: "Audit, files, billing, more languages",
+    items: [
+      "Audit events (aud_) — first-class primitive backed by the auth.kind discriminator",
+      "Notifications (not_) and file metadata (file_)",
       "Feature flags (flag_) and billing hooks (sub_)",
+      "Group-as-subject (grp_), rewrite-rule intersection / exclusion / recursive closures",
       "Additional language SDKs as adopter demand emerges",
     ],
   },
@@ -82,7 +94,7 @@ export function Roadmap() {
           </p>
         </div>
 
-        <div className="mt-12 grid grid-cols-1 gap-5 md:grid-cols-3">
+        <div className="mt-12 grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-4">
           {milestones.map(({ version, status, title, items }) => {
             const { label, icon: Icon, color } = STATUS_META[status];
             return (

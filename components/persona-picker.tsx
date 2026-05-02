@@ -174,7 +174,7 @@ const PERSONAS: Persona[] = [
       "The hand-rolled permission system you'll regret in six months",
     ],
     doesNotReplace: [
-      "Stripe — billing is out of scope for v0.2 (sub_ prefix reserved for v0.3+)",
+      "Stripe — billing is out of scope (sub_ prefix reserved for v0.4+)",
       "Your domain logic — Flametrench is the boring substrate, not your product",
       "Marketing, customer support, or anything else that actually grows the business",
     ],
