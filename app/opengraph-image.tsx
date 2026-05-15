@@ -4,6 +4,12 @@ export const alt = "Flametrench — Backbone infrastructure for applications";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
+// `output: 'export'` requires every route to declare its rendering
+// posture explicitly. This OG image renders identically on every
+// build; `force-static` tells Next to generate the PNG once at
+// build time and emit it into `out/opengraph-image.png`.
+export const dynamic = "force-static";
+
 export default async function OpengraphImage() {
   return new ImageResponse(
     (
