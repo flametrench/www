@@ -1,0 +1,230 @@
+# sitesource/cloud — react-spa deploy workflow stub
+#
+# Copy to .github/workflows/deploy.yml in your SPA repository.
+#
+# Trigger paths:
+#   1. Manual:    gh workflow run deploy.yml -f stage=staging
+#   2. Phase 3+:  admin's deploy-trigger endpoint dispatches this via
+#                 the GitHub workflow_dispatch API, passing run_id.
+#
+# Required GitHub repository secrets:
+#   AWS_DEPLOY_ROLE_ARN  IAM role ARN. Trust policy template at
+#                        iam-trust-policy.template.json.
+#
+# Required GitHub repository variables:
+#   CLOUD_PROJECT_SLUG   Your admin cloud_project.slug.
+#   CLOUD_REGION         AWS region (defaults to us-east-1).
+#
+# Optional repository variables (Phase 3+):
+#   ADMIN_WEBHOOK_URL    Admin's webhook base URL.
+# Optional repository secrets (Phase 3+):
+#   ADMIN_WEBHOOK_SECRET HMAC shared secret for webhook signing.
+#
+# Pre-requisite: the cloudformation/infrastructure.yml stack has been
+# deployed for this stage. The stack outputs AssetsBucketName and
+# DistributionId; this workflow looks them up via the AWS CLI.
+#
+# Security note: untrusted GH context values (vars.*, secrets.*,
+# inputs.*) are NEVER interpolated into shell scripts directly — they
+# go through `env:` mappings which bash properly quotes. `eval` is
+# never used. See cloud's audit notes (F1) for context.
+
+name: Deploy via SiteSource Cloud
+
+on:
+    workflow_dispatch:
+        inputs:
+            stage:
+                description: 'Environment stage (production / staging / preview)'
+                required: true
+                type: choice
+                default: staging
+                options:
+                    - staging
+                    - production
+                    - preview
+            run_id:
+                description: 'cloud_run id from admin (Phase 3+; leave blank for manual)'
+                required: false
+                type: string
+
+permissions:
+    id-token: write
+    contents: read
+
+env:
+    CLOUD_PROJECT_SLUG: flametrench-www
+    CLOUD_REGION: ${{ vars.CLOUD_REGION || 'us-east-1' }}
+
+jobs:
+    deploy:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            # Capture the runner's start time for the run_completed
+            # webhook payload's `started_at` field. Admin's deploy
+            # action already flipped cloud_run.status to `running` at
+            # workflow_dispatch time; `started_at` here reflects when
+            # the runner actually began executing.
+            - name: Capture deploy start time
+              run: echo "DEPLOY_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+
+            - name: Configure AWS credentials via OIDC
+              uses: aws-actions/configure-aws-credentials@v4
+              with:
+                  role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+                  aws-region: ${{ env.CLOUD_REGION }}
+
+            - name: Set up pnpm
+              uses: pnpm/action-setup@v4
+              with:
+                  version: 9
+
+            - name: Set up Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: '20'
+                  cache: 'pnpm'
+
+            - name: Install dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: Build SPA
+              run: pnpm run build
+              env:
+                  NODE_ENV: production
+                  NEXT_PUBLIC_STAGE: ${{ inputs.stage }}
+
+            - name: Resolve infrastructure outputs
+              id: infra
+              env:
+                  STAGE: ${{ inputs.stage }}
+              run: |
+                  set -euo pipefail
+                  STACK="cloud-${CLOUD_PROJECT_SLUG}-${STAGE}"
+                  bucket=$(aws cloudformation describe-stacks --stack-name "$STACK" --query "Stacks[0].Outputs[?OutputKey=='AssetsBucketName'].OutputValue" --output text)
+                  dist=$(aws cloudformation describe-stacks --stack-name "$STACK" --query "Stacks[0].Outputs[?OutputKey=='DistributionId'].OutputValue" --output text)
+                  if [ -z "$bucket" ] || [ -z "$dist" ]; then
+                      echo "Stack $STACK not found or outputs missing. Apply cloudformation/infrastructure.yml first." >&2
+                      exit 1
+                  fi
+                  echo "bucket=$bucket" >> "$GITHUB_OUTPUT"
+                  echo "dist=$dist" >> "$GITHUB_OUTPUT"
+                  echo "Bucket: $bucket"
+                  echo "Distribution: $dist"
+
+            - name: Sync build output to S3
+              # `--delete` removes objects no longer in the build, keeping the
+              # bucket in lock-step with the deployed bundle.
+              #
+              # Auto-detects the build output directory: Next.js static
+              # export writes to `out/`, Vite/CRA/Astro write to `dist/`,
+              # older CRA writes to `build/`. If your tool uses a different
+              # directory, set BUILD_DIR explicitly via `vars.BUILD_DIR` or
+              # hardcode here.
+              env:
+                  BUCKET: ${{ steps.infra.outputs.bucket }}
+                  BUILD_DIR_OVERRIDE: ${{ vars.BUILD_DIR }}
+              run: |
+                  set -euo pipefail
+                  if [ -n "${BUILD_DIR_OVERRIDE:-}" ]; then
+                      build_dir="$BUILD_DIR_OVERRIDE"
+                  elif [ -d ./out ]; then
+                      build_dir=./out
+                  elif [ -d ./dist ]; then
+                      build_dir=./dist
+                  elif [ -d ./build ]; then
+                      build_dir=./build
+                  else
+                      echo "::error::No build output directory found. Tried: out/, dist/, build/." >&2
+                      echo "::error::Set the vars.BUILD_DIR repo variable if your tool writes elsewhere." >&2
+                      exit 1
+                  fi
+                  echo "Syncing $build_dir to s3://$BUCKET"
+                  aws s3 sync "$build_dir" "s3://$BUCKET" --delete --no-progress
+
+            - name: Invalidate CloudFront cache
+              env:
+                  DIST: ${{ steps.infra.outputs.dist }}
+              run: |
+                  set -euo pipefail
+                  invalidation_id=$(aws cloudfront create-invalidation --distribution-id "$DIST" --paths "/*" --query "Invalidation.Id" --output text)
+                  echo "Invalidation: $invalidation_id"
+                  aws cloudfront wait invalidation-completed --distribution-id "$DIST" --id "$invalidation_id"
+
+            # ─── webhook-IN: notify admin's run_completed handler ───────
+            # ADR 0019 (Accepted 2026-05-15). Closes cloud_run's
+            # lifecycle loop: admin's deploy action created the row at
+            # status=pending (and flipped it to running at
+            # workflow_dispatch); this step flips it to succeeded/failed
+            # when the job finishes.
+            #
+            # Body shape (8 fields):
+            #   { run_id, status, git_sha, started_at, finished_at,
+            #     provider_run_url, failure_step, failure_summary }
+            #
+            # HMAC: sha256 over the raw POST body, sent as
+            # `X-Admin-Webhook-Signature: sha256=<hex>` (admin ADR
+            # 0019 D3 as shipped in 19a + 19c). Secret resolved from
+            # the GH repo secret `ADMIN_WEBHOOK_SECRET`, which MUST
+            # match the env var named by cloud's WebhookHmacAuth.
+            # secret_env (CLOUD_RUN_COMPLETED_SECRET) on the admin host.
+            #
+            # ADMIN_WEBHOOK_URL repo variable form:
+            #   https://<admin-host>/v1/webhooks
+            # (the controller path /cloud/run_completed is appended.)
+            #
+            # `failure_step` is a classifier token (NOT an int step
+            # index) per the admin#52 resolution. For SPA deploys
+            # we emit a coarse-grained token derived from job.status;
+            # operators can drill via provider_run_url for step-level
+            # detail.
+            - name: Notify admin — outcome (webhook-IN, ADR 0019)
+              if: always() && inputs.run_id != ''
+              continue-on-error: true
+              env:
+                  WEBHOOK_URL:    ${{ vars.ADMIN_WEBHOOK_URL }}
+                  WEBHOOK_SECRET: ${{ secrets.ADMIN_WEBHOOK_SECRET }}
+                  RUN_ID:         ${{ inputs.run_id }}
+                  GIT_SHA:        ${{ github.sha }}
+                  RUN_URL:        ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+                  JOB_STATUS:     ${{ job.status }}
+                  STARTED_AT:     ${{ env.DEPLOY_STARTED_AT }}
+              run: |
+                  set -euo pipefail
+                  if [ -z "${WEBHOOK_URL:-}" ]; then
+                      echo "::warning::ADMIN_WEBHOOK_URL repo variable not set — skipping webhook callback."
+                      exit 0
+                  fi
+                  if [ -z "${WEBHOOK_SECRET:-}" ]; then
+                      echo "::warning::ADMIN_WEBHOOK_SECRET repo secret not set — skipping webhook callback (HMAC verification would 401 on admin)."
+                      exit 0
+                  fi
+                  outcome=$([ "$JOB_STATUS" = "success" ] && echo "succeeded" || echo "failed")
+                  finished_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+                  if [ "$outcome" = "failed" ]; then
+                      failure_step="github_actions_job"
+                      failure_summary="GitHub Actions job reported job.status=$JOB_STATUS. Inspect the run for step-level detail."
+                  else
+                      failure_step=null
+                      failure_summary=null
+                  fi
+                  payload=$(jq -nc \
+                      --arg run_id           "$RUN_ID" \
+                      --arg status           "$outcome" \
+                      --arg git_sha          "$GIT_SHA" \
+                      --arg started_at       "$STARTED_AT" \
+                      --arg finished_at      "$finished_at" \
+                      --arg provider_run_url "$RUN_URL" \
+                      --argjson failure_step    "$([ "$failure_step"    = null ] && echo null || jq -Rn --arg s "$failure_step"    '$s')" \
+                      --argjson failure_summary "$([ "$failure_summary" = null ] && echo null || jq -Rn --arg s "$failure_summary" '$s')" \
+                      '{run_id:$run_id, status:$status, git_sha:$git_sha, started_at:$started_at, finished_at:$finished_at, provider_run_url:$provider_run_url, failure_step:$failure_step, failure_summary:$failure_summary}')
+                  sig=$(printf '%s' "$payload" | openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" -hex | awk '{print $2}')
+                  # POST to admin's PluginWebhookController route:
+                  #   POST /v1/webhooks/cloud/run_completed
+                  curl -fsS -X POST "$WEBHOOK_URL/cloud/run_completed" \
+                      -H "Content-Type: application/json" \
+                      -H "X-Admin-Webhook-Signature: sha256=$sig" \
+                      -d "$payload" || true
