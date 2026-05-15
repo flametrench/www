@@ -13,7 +13,7 @@ export default function DocsIndex() {
         Documentation
       </p>
       <h1 className="mt-2 text-4xl font-semibold tracking-tight">
-        Flametrench v0.2
+        Flametrench v0.3
       </h1>
       <p className="mt-5 text-[color:var(--color-fg-muted)]">
         This is the documentation for the Flametrench specification and the

@@ -34,42 +34,42 @@ interface Row {
 const ROWS: Row[] = [
   {
     pkg: "ids",
-    blurb: "Wire-format identifiers (UUIDv7, prefixed).",
+    blurb: "Wire-format identifiers (UUIDv7, prefixed). v0.3 adds the pat_ prefix.",
     cells: {
-      node: { version: "v0.2.0", channel: "live" },
-      php: { version: "v0.2.0", channel: "live" },
-      python: { version: "v0.2.0", channel: "pending" },
-      java: { version: "v0.2.0", channel: "pending" },
+      node: { version: "v0.3.0", channel: "pending" },
+      php: { version: "v0.3.0", channel: "pending" },
+      python: { version: "v0.3.0", channel: "pending" },
+      java: { version: "v0.3.0", channel: "pending" },
     },
   },
   {
     pkg: "identity",
-    blurb: "Users, credentials, sessions, MFA, display name, listUsers.",
+    blurb: "Users, credentials, sessions, MFA, display name, listUsers, v0.3 personal access tokens.",
     cells: {
-      node: { version: "v0.2.1", channel: "live" },
-      php: { version: "v0.2.0", channel: "live" },
-      python: { version: "v0.2.0", channel: "pending" },
-      java: { version: "v0.2.0", channel: "pending" },
+      node: { version: "v0.3.0", channel: "pending" },
+      php: { version: "v0.3.0", channel: "pending" },
+      python: { version: "v0.3.0", channel: "pending" },
+      java: { version: "v0.3.0", channel: "pending" },
     },
   },
   {
     pkg: "tenancy",
     blurb: "Organizations, memberships, invitations.",
     cells: {
-      node: { version: "v0.2.1", channel: "live" },
-      php: { version: "v0.2.0", channel: "live" },
-      python: { version: "v0.2.0", channel: "pending" },
-      java: { version: "v0.2.0", channel: "pending" },
+      node: { version: "v0.3.0", channel: "pending" },
+      php: { version: "v0.3.0", channel: "pending" },
+      python: { version: "v0.3.0", channel: "pending" },
+      java: { version: "v0.3.0", channel: "pending" },
     },
   },
   {
     pkg: "authz",
-    blurb: "Tuples, check(), rewrite rules, share tokens.",
+    blurb: "Tuples, check(), rewrite rules, share tokens, v0.3 Postgres rule evaluation.",
     cells: {
-      node: { version: "v0.2.1", channel: "live" },
-      php: { version: "v0.2.0", channel: "live" },
-      python: { version: "v0.2.0", channel: "pending" },
-      java: { version: "v0.2.0", channel: "pending" },
+      node: { version: "v0.3.0", channel: "pending" },
+      php: { version: "v0.3.0", channel: "pending" },
+      python: { version: "v0.3.0", channel: "pending" },
+      java: { version: "v0.3.0", channel: "pending" },
     },
   },
 ];
@@ -147,9 +147,10 @@ export function StatusMatrix() {
             Package × language × registry.
           </h2>
           <p className="mt-4 text-[color:var(--color-fg-muted)]">
-            v0.2 stable. All four core packages, all four languages — same
-            semantics, conformance-tested across the family. Registry channels
-            light up as each is published.
+            v0.3 stable, tagged 2026-05-15. All four core packages, all four
+            languages — same semantics, conformance-tested across the family.
+            Registry channels light up as each v0.3.0 publish lands; PyPI and
+            Maven Central remain blocked on external approvals.
           </p>
         </div>
 
