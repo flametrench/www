@@ -28,7 +28,7 @@ interface Cell {
 interface Row {
   pkg: string;
   blurb: string;
-  cells: { node: Cell; php: Cell; python: Cell; java: Cell };
+  cells: { node: Cell; php: Cell; python: Cell; java: Cell; go: Cell };
 }
 
 const ROWS: Row[] = [
@@ -40,6 +40,7 @@ const ROWS: Row[] = [
       php: { version: "v0.3.0", channel: "pending" },
       python: { version: "v0.3.0", channel: "pending" },
       java: { version: "v0.3.0", channel: "pending" },
+      go: { version: "v0.3.0", channel: "pending" },
     },
   },
   {
@@ -50,6 +51,7 @@ const ROWS: Row[] = [
       php: { version: "v0.3.0", channel: "pending" },
       python: { version: "v0.3.0", channel: "pending" },
       java: { version: "v0.3.0", channel: "pending" },
+      go: { version: "v0.3.0", channel: "planned" },
     },
   },
   {
@@ -60,6 +62,7 @@ const ROWS: Row[] = [
       php: { version: "v0.3.0", channel: "pending" },
       python: { version: "v0.3.0", channel: "pending" },
       java: { version: "v0.3.0", channel: "pending" },
+      go: { version: "v0.3.0", channel: "planned" },
     },
   },
   {
@@ -70,6 +73,7 @@ const ROWS: Row[] = [
       php: { version: "v0.3.0", channel: "pending" },
       python: { version: "v0.3.0", channel: "pending" },
       java: { version: "v0.3.0", channel: "pending" },
+      go: { version: "v0.3.0", channel: "planned" },
     },
   },
 ];
@@ -133,6 +137,13 @@ const LANGUAGES: Array<{
     registryUrl: "https://central.sonatype.com/artifact/dev.flametrench/",
     pkgPrefix: "dev.flametrench:",
   },
+  {
+    key: "go",
+    name: "Go",
+    registry: "Go modules",
+    registryUrl: "https://pkg.go.dev/github.com/flametrench/flametrench-go/packages/",
+    pkgPrefix: "github.com/flametrench/flametrench-go/packages/",
+  },
 ];
 
 export function StatusMatrix() {
@@ -147,9 +158,12 @@ export function StatusMatrix() {
             Package × language × registry.
           </h2>
           <p className="mt-4 text-[color:var(--color-fg-muted)]">
-            v0.3 stable, tagged 2026-05-15. All four core packages, all four
-            languages — same semantics, conformance-tested across the family.
-            Registry channels light up as each v0.3.0 publish lands; PyPI and
+            v0.3 stable, held for 5-family lockstep (ADR 0018 — Go joins as
+            the fifth SDK family). All four core packages, five languages —
+            same semantics, conformance-tested across the matrix. Go is
+            scaffolded with ids landed and conformance green; identity /
+            tenancy / authz follow ahead of the v0.3.0 release tag.
+            Registry channels light up as each publish lands; PyPI and
             Maven Central remain blocked on external approvals.
           </p>
         </div>
