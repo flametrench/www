@@ -222,7 +222,7 @@ MFA ships as first-class in v0.2 (ADRs 0008 + 0010). Three factor types under th
 
 - **TOTP** (RFC 6238) — SHA-1/SHA-256/SHA-512. Standard test vectors pinned in conformance.
 - **WebAuthn assertion** — ES256, RS256 (≥2048-bit), and EdDSA (Ed25519). Dispatched from the COSE_Key `alg` field. Signature counter monotonicity enforced per WebAuthn spec §6.1.1 for cloned-authenticator detection.
-- **Recovery codes** — 10 single-use codes in a 31-char alphabet excluding `0/O/1/I/L`.
+- **Recovery codes** — 10 single-use codes, each 12 characters long (format `XXXX-XXXX-XXXX`), drawn from a 31-character alphabet excluding `0/O/1/I/L`.
 
 ### MFA policy
 
@@ -265,7 +265,7 @@ uri = identity_store.totp_otpauth_uri(secret, issuer="MyApp", account=email)
 
 ### Recovery codes
 
-Recovery codes are generated as a set and stored hashed. Each code is single-use; the store marks it consumed on verify. When a user runs out of codes, issue a new set via `enrollMfaFactor(usr_id, type="recovery")`.
+Recovery codes are generated as a set and stored hashed. Each code is 12 characters in `XXXX-XXXX-XXXX` format and is single-use; the store marks it consumed on verify. When a user runs out of codes, issue a new set via `enrollMfaFactor(usr_id, type="recovery")`.
 
 ## Personal access tokens (v0.3)
 
@@ -295,7 +295,7 @@ This prevents cross-type token substitution without per-endpoint configuration.
 
 ### Verification semantics (normative ordering)
 
-1. Parse the token into `(id_part, secret_part)` at the last `_` before the base64url run.
+1. Parse the token into `(id_part, secret_part)` at the second `_` (the base64url secret component may itself contain `_` characters; splitting on the last `_` would produce an incorrect boundary).
 2. Look up the row by `pat_id`. If no row matches, raise `InvalidPatTokenError`.
 3. Argon2id-verify `secret_part` against the stored `secret_hash`. If mismatch, raise `InvalidPatTokenError` (conflated shape — no timing oracle on token presence).
 4. If `revoked_at` is non-null, raise `InvalidPatTokenError`.
@@ -327,7 +327,7 @@ Audit records from v0.3 carry an `auth.kind` field distinguishing the authentica
 | `session` | A `ses_` bearer token |
 | `share` | A `shr_` share-token verify |
 | `pat` | A `pat_` personal access token |
-| `system` | Internal / unauthenticated system action |
+| `system` | Automation with no human principal (no `usr_id`) |
 
 Applications SHOULD log this field alongside the `usr_id` for audit completeness.
 
@@ -345,18 +345,18 @@ Given an OIDC credential with `issuer = "https://accounts.google.com"` and `subj
 
 ### MFA TOTP vectors (v0.2)
 
-18 RFC 6238 §B test vectors are pinned in `spec/conformance/identity/mfa/totp-rfc6238.json`. Every SDK MUST pass all 18.
+18 RFC 6238 §B test vectors are pinned in `spec/conformance/fixtures/identity/mfa/totp-rfc6238.json`. Every SDK MUST pass all 18.
 
 ### MFA recovery-code format (v0.2)
 
-Recovery codes MUST be 31 characters from the allowed alphabet (excluding `0/O/1/I/L`). 12 fixture tests in `spec/conformance/identity/mfa/recovery-code-format.json`.
+Recovery codes MUST be 12 characters in `XXXX-XXXX-XXXX` format, drawn from a 31-character alphabet (excluding `0/O/1/I/L`). 12 fixture tests in `spec/conformance/fixtures/identity/mfa/recovery-code-format.json`.
 
 ### WebAuthn assertion (v0.2 + v0.3)
 
-7 ES256 + 6 algorithm-dispatch (RS256, EdDSA) tests in `spec/conformance/identity/mfa/webauthn-assertion.json` and `webauthn-assertion-algorithms.json`. Counter-decrease rejection: 4 tests.
+7 ES256 + 6 algorithm-dispatch (RS256, EdDSA) tests in `spec/conformance/fixtures/identity/mfa/webauthn-assertion.json` and `webauthn-assertion-algorithms.json`. Counter-decrease rejection: 4 tests.
 
 ### PAT token format (v0.3)
 
-11 structural-validation tests in `spec/conformance/identity/pat/token-format.json` pinning the `pat_<32hex>_<base64url>` wire-format rules.
+11 structural-validation tests in `spec/conformance/fixtures/identity/pat/token-format.json` pinning the `pat_<32hex>_<base64url>` wire-format rules.
 
 More conformance fixtures will be added in `spec/conformance/` as implementations surface specific interoperability questions.

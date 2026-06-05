@@ -81,13 +81,13 @@ PAT identifiers use a two-part wire format distinct from other types:
 pat_<32hex-id>_<base64url-secret>
 ```
 
-The `pat_<32hex>` portion is the stored ID (a standard `tup_`-style Flametrench identifier). The `_<base64url-secret>` suffix carries the opaque secret component that proves possession. The bearer token routing layer recognizes the `pat_` prefix and dispatches to the PAT verifier before session or share verifiers. See [ADR 0016](../decisions/0016-personal-access-tokens.md) and the Identity chapter for the full verification semantics.
+The `pat_<32hex>` portion is the stored ID (a standard `{type}_{32hex}` Flametrench identifier). The `_<base64url-secret>` suffix carries the opaque secret component that proves possession. The bearer token routing layer recognizes the `pat_` prefix and dispatches to the PAT verifier before session or share verifiers. See [ADR 0016](../decisions/0016-personal-access-tokens.md) and the Identity chapter for the full verification semantics.
 
 Reserved prefixes for future capabilities (not usable in current implementations):
 
 | Prefix  | Planned resource        | Capability      |
 | ------- | ----------------------- | --------------- |
-| `aud`   | Audit event             | Audit           |
+| `aud`   | Audit event             | Audit (v0.4, proposed) |
 | `not`   | Notification            | Notifications   |
 | `file`  | File                    | Files           |
 | `flag`  | Feature flag            | Feature flags   |

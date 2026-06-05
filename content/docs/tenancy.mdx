@@ -229,6 +229,6 @@ Any failure rolls back the entire transaction. The invitation remains `pending` 
 
 - **`removed_by` attribution.** A membership revoked via `selfLeave` MUST have `removed_by = NULL`. A membership revoked via `adminRemove` MUST have `removed_by` set to the admin's `usr_id`.
 
-- **Invitation acceptance binding (ADR 0009).** `acceptInvitation` called with `as_usr_id` but without `accepting_identifier` MUST return `IdentifierBindingRequiredError`. Called with a mismatched `accepting_identifier` MUST return `IdentifierBindingMismatchError`. 4 fixture tests in `spec/conformance/tenancy/invitation-accept-binding.json`.
+- **Invitation acceptance binding (ADR 0009).** `acceptInvitation` called with `as_usr_id` but without `accepting_identifier` MUST return `IdentifierBindingRequiredError`. Called with a mismatched `accepting_identifier` MUST return `IdentifierMismatchError`. 4 fixture tests in `spec/conformance/fixtures/tenancy/invitation-accept-binding.json`.
 
 More fixtures will be added in `spec/conformance/` as implementations surface specific questions.
