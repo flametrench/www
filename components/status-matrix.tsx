@@ -41,7 +41,7 @@ const ROWS: Row[] = [
       php: { version: "v0.2.0", channel: "live" },
       python: { version: "v0.2.0", channel: "pending" },
       java: { version: "v0.2.0", channel: "pending" },
-      go: { version: "v0.3.0", channel: "live" },
+      go: { version: "v0.3.0", channel: "pending" },
     },
   },
   {
@@ -52,7 +52,7 @@ const ROWS: Row[] = [
       php: { version: "v0.2.0", channel: "live" },
       python: { version: "v0.2.0", channel: "pending" },
       java: { version: "v0.2.0", channel: "pending" },
-      go: { version: "v0.3.0", channel: "live" },
+      go: { version: "v0.3.0", channel: "pending" },
     },
   },
   {
@@ -63,7 +63,7 @@ const ROWS: Row[] = [
       php: { version: "v0.2.0", channel: "live" },
       python: { version: "v0.2.0", channel: "pending" },
       java: { version: "v0.2.0", channel: "pending" },
-      go: { version: "v0.3.0", channel: "live" },
+      go: { version: "v0.3.0", channel: "pending" },
     },
   },
   {
@@ -74,7 +74,7 @@ const ROWS: Row[] = [
       php: { version: "v0.2.0", channel: "live" },
       python: { version: "v0.2.0", channel: "pending" },
       java: { version: "v0.2.0", channel: "pending" },
-      go: { version: "v0.3.0", channel: "live" },
+      go: { version: "v0.3.0", channel: "pending" },
     },
   },
 ];
