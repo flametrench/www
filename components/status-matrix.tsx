@@ -165,7 +165,7 @@ export function StatusMatrix() {
             Package × language × registry.
           </h2>
           <p className="mt-4 text-[color:var(--color-fg-muted)]">
-            The specification is at <span className="font-medium text-[color:var(--color-fg)]">v0.3.0 · stable</span>. SDK families implement the spec at their own release cadence — Go ships the v0.3 contract today; Node and PHP are at v0.2.x with v0.3 releases forthcoming; Python and Java are pending registry publication.
+            The specification is at <span className="font-medium text-[color:var(--color-fg)]">v0.3.0 · stable</span>. SDK families implement the spec at their own release cadence — Node and PHP are at v0.2.x with v0.3 releases forthcoming; Go&rsquo;s v0.3.0 implementation is conformance-green, tag pending; Python and Java are pending registry publication.
           </p>
         </div>
 
