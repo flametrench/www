@@ -165,9 +165,7 @@ export function StatusMatrix() {
             Package × language × registry.
           </h2>
           <p className="mt-4 text-[color:var(--color-fg-muted)]">
-            v0.3 stable. All four core packages, five languages — same
-            semantics, conformance-tested across the family. Registry channels
-            light up as each is published.
+            The specification is at <span className="font-medium text-[color:var(--color-fg)]">v0.3.0 · stable</span>. SDK families implement the spec at their own release cadence — Go ships the v0.3 contract today; Node and PHP are at v0.2.x with v0.3 releases forthcoming; Python and Java are pending registry publication.
           </p>
         </div>
 
@@ -229,20 +227,24 @@ export function StatusMatrix() {
           </table>
         </div>
 
-        <p className="mt-6 max-w-3xl text-xs text-[color:var(--color-fg-muted)]">
+        <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-[color:var(--color-fg-muted)]">
+          <span className="font-mono text-[color:var(--color-fg-faint)] uppercase tracking-wider text-[11px]">
+            Protocol: v0.3.0
+          </span>
+          <span className="text-[color:var(--color-border-strong)]" aria-hidden>|</span>
           <span className="inline-flex items-center gap-1">
             <CheckCircle2 size={12} className="text-emerald-400" /> Live
           </span>{" "}
           — installable today.
-          <span className="ml-3 inline-flex items-center gap-1">
+          <span className="inline-flex items-center gap-1">
             <CheckCircle2 size={12} className="text-sky-400" /> RC
           </span>{" "}
           — pre-release, installable via rc dist-tag.
-          <span className="ml-3 inline-flex items-center gap-1">
+          <span className="inline-flex items-center gap-1">
             <Clock size={12} className="text-amber-400" /> Pending
           </span>{" "}
           — publishing soon.
-        </p>
+        </div>
 
         <div className="mt-8 flex flex-wrap gap-3 text-sm">
           <Link
