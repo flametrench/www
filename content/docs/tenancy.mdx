@@ -2,7 +2,7 @@
 
 Flametrench tenancy covers how organizations are structured, how users join them, how membership role changes are recorded, and how memberships are removed.
 
-Three entities comprise tenancy in v0.1:
+Three entities comprise tenancy:
 
 - **`org_`** — an organization: a unit of tenancy. A company, a team, a workspace.
 - **`mem_`** — a membership: a user's participation in an org, carrying a role and lifecycle metadata.
@@ -22,7 +22,7 @@ Organizations are opaque: no name, no slug, no billing plan in the spec. Those a
 
 ### Flat hierarchy
 
-v0.1 supports only flat orgs: an `org_` has no parent org. Modeling divisions or sub-teams is done either outside the spec (application-level structure) or in v0.2+ when rewrite rules land and cross-org inheritance becomes safe to derive.
+Flametrench supports only flat orgs: an `org_` has no parent org. Modeling divisions or sub-teams is done either outside the spec (application-level structure) or via rewrite rules (v0.2+) for cross-org inheritance in authorization.
 
 ### Lifecycle
 
@@ -78,7 +78,7 @@ Role changes MUST NOT be performed as in-place updates to `mem.role`. Instead:
 
 All four steps happen in one transaction.
 
-Walking the `replaces` chain yields the full role history with monotonic timestamps. The root of the chain (`replaces IS NULL`) carries the original join date; the head carries the current state.
+Walking the `replaces` chain yields the full role history with monotonic timestamps.
 
 ### Status transitions
 
@@ -176,6 +176,28 @@ On accept, each becomes a `tup_` row with the accepting user as subject.
 
 This is how Carol-the-contractor (guest of Acme, viewer of `project_42`) is modeled in a single invitation.
 
+### Invitation acceptance binding (v0.1.1 security, ADR 0009)
+
+`acceptInvitation` requires the caller to supply `accepting_identifier`, which MUST byte-match `invitation.identifier` when `as_usr_id` is supplied. This closes a privilege-escalation primitive where any authenticated user could accept an admin-targeted invitation by supplying another user's `as_usr_id`.
+
+**Required call shape:**
+
+```python
+# Before v0.1.1 (vulnerable — do not use):
+store.accept_invitation(inv_id, as_usr_id=authed_usr_id)
+
+# v0.1.1 and later (required):
+store.accept_invitation(
+    inv_id,
+    as_usr_id=authed_usr_id,
+    accepting_identifier=identity_store.canonical_identifier(authed_usr_id),
+)
+```
+
+**Sourcing requirement (normative):** `accepting_identifier` MUST come from the authenticated session — typically the canonical email/handle attached to the bearer token's `usr_id`. It MUST NOT come from the request body without an authenticity check. The SDK enforces byte-equality; the host's auth layer enforces source authenticity.
+
+This was backported into v0.1.x. Adopters on v0.1.0 should upgrade their tenancy SDK to at least v0.1.1 immediately.
+
 ### Atomic acceptance
 
 The `acceptInvitation(inv_id, ...)` operation MUST execute in a single transaction:
@@ -191,7 +213,7 @@ Any failure rolls back the entire transaction. The invitation remains `pending` 
 ### Operations
 
 - `createInvitation(org_id, identifier, role, pre_tuples?, expires_at) → inv_id`.
-- `acceptInvitation(inv_id, as_usr_id?)` — if the invitee already has an account, pass their `usr_id`; otherwise the operation creates one.
+- `acceptInvitation(inv_id, as_usr_id?, accepting_identifier)` — if the invitee already has an account, pass their `usr_id`; otherwise the operation creates one.
 - `declineInvitation(inv_id, as_usr_id?)`.
 - `revokeInvitation(inv_id, admin_usr_id)` — subject to admin authorization on the target org.
 - `getInvitation(inv_id) → inv`.
@@ -206,5 +228,7 @@ Any failure rolls back the entire transaction. The invitation remains `pending` 
 - **Pre-tuple expansion.** An invitation with `pre_tuples = [{"relation":"viewer", "object_type":"project", "object_id":"<uuid>"}]`, when accepted, MUST result in exactly one additional `tup_` row beyond the membership tuple, with the specified relation and object and subject=accepting user.
 
 - **`removed_by` attribution.** A membership revoked via `selfLeave` MUST have `removed_by = NULL`. A membership revoked via `adminRemove` MUST have `removed_by` set to the admin's `usr_id`.
+
+- **Invitation acceptance binding (ADR 0009).** `acceptInvitation` called with `as_usr_id` but without `accepting_identifier` MUST return `IdentifierBindingRequiredError`. Called with a mismatched `accepting_identifier` MUST return `IdentifierBindingMismatchError`. 4 fixture tests in `spec/conformance/tenancy/invitation-accept-binding.json`.
 
 More fixtures will be added in `spec/conformance/` as implementations surface specific questions.

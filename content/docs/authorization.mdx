@@ -9,16 +9,16 @@ This chapter is normative. Rationale and alternatives are in [ADR 0001 — Autho
 ### Entity shape
 
 - `id` — UUIDv7; `tup_<hex>`.
-- `subject_type` — the type prefix of the subject. In v0.1, MUST be `usr`.
+- `subject_type` — the type prefix of the subject. Currently MUST be `usr`.
 - `subject_id` — the UUIDv7 of the subject.
 - `relation` — a string matching `^[a-z_]{2,32}$`. Either a registered relation (below) or an application-custom relation.
-- `object_type` — the type prefix of the object. MAY be any valid type prefix (2–6 lowercase ASCII characters, matching `^[a-z]{2,6}$`). v0.1 registered object types include `org`, `mem`, `inv`, `ses`, `cred`, `usr`. Applications MAY introduce custom object types (`project`, `doc`, etc.).
+- `object_type` — the type prefix of the object. MAY be any valid type prefix (2–6 lowercase ASCII characters, matching `^[a-z]{2,6}$`). Registered object types include `org`, `mem`, `inv`, `ses`, `cred`, `usr`. Applications MAY introduce custom object types (`project`, `doc`, etc.).
 - `object_id` — the UUIDv7 of the object.
 - `created_at`, `created_by` (nullable).
 
 The natural key of a tuple is the 5-tuple `(subject_type, subject_id, relation, object_type, object_id)`. This combination MUST be unique; duplicate grants are prohibited.
 
-### Registered relations (v0.1)
+### Registered relations
 
 Six built-in relations. The spec pins their semantic intent; applications SHOULD use them when the intent matches.
 
@@ -80,23 +80,101 @@ Returns `true` if a tuple exists for `subject` on `object` with any of the liste
 
 Implementations MUST accept both forms. The relation set in the set-form MUST be non-empty.
 
-### Exact-match semantics
+### Exact-match semantics (default)
 
-v0.1 performs EXACT match only. There is:
+By default, `check()` performs exact match only — no derivations, no inheritance. When no rewrite rules are registered, there is:
 
 - **No relation implication.** `admin` does not imply `editor`. `editor` does not imply `viewer`.
 - **No parent-child inheritance.** `viewer` of `org_acme` does not imply `viewer` of any project in `org_acme`.
-- **No group expansion.** v0.1 has no `grp_` subject type.
+- **No group expansion.** Group subjects remain deferred.
 
-If an application's authorization policy requires any of these derivations, the application is responsible for them — either by materializing the implied tuples at state-change time, or by constructing appropriate relation sets at check time.
+If an application's authorization policy requires any of these derivations, three options are available:
 
-### Deferred: rewrite rules
+1. **Materialize implied tuples** at state-change time (write all implied grants explicitly).
+2. **Compose checks at call sites** using the set form of `check()`.
+3. **Register rewrite rules** (v0.2) — declarative derivation with depth and fan-out caps. See below.
 
-Rewrite rules (declarative derivation) are deferred to v0.2+. See [ADR 0001](../decisions/0001-authorization-model.md) for rationale. The v0.1 tuple primitive is forward-compatible with every candidate rewrite-rule system considered.
+## Rewrite rules (v0.2 / v0.3)
+
+Rewrite rules let you declare authorization policies that `check()` evaluates automatically — role implication, parent-child inheritance, and similar derivations. Rules are registered at store-construction time; when no rules are registered, `check()` behavior is byte-identical to pure exact-match (full backward compatibility with any v0.1 call site).
+
+Rationale and the full evaluation model live in [ADR 0007 — Authorization rewrite rules](../decisions/0007-authorization-rewrite-rules.md).
+
+**v0.2:** In-memory tuple store supports rewrite rules.  
+**v0.3:** `PostgresTupleStore.check()` accepts the same `rules` option and evaluates via iterative async expansion ([ADR 0017](../decisions/0017-postgres-rewrite-rule-evaluation.md)). Adopters who need Postgres durability with rules no longer need an in-memory shadow store.
+
+### Three node types
+
+A rule is keyed on `(object_type, relation)` and contains a **union** of one or more nodes:
+
+- **`this`** — the explicit-tuple set. Identical to v0.1 exact-match semantics; always implicitly part of every rule's union. Listing `this` explicitly is documentation, not behavior change.
+- **`computed_userset { relation: <name> }`** — anyone holding `<name>` on the same object. Used for role implication: `editor` implies `viewer`.
+- **`tuple_to_userset { tupleset: { relation: <ttu> }, computed_userset: { relation: <target> } }`** — anyone holding `<target>` on the object pointed to by the `<ttu>` relation from the current object. Used for parent-child inheritance.
+
+Not included in v0.2 rules: intersection, exclusion, and transitive closure. See ADR 0007 for rationale.
+
+### Example: role implication and parent-child inheritance
+
+```yaml
+rules:
+  proj:
+    viewer:
+      union:
+        - this
+        - computed_userset: { relation: editor }
+        - tuple_to_userset:
+            tupleset: { relation: parent_org }
+            computed_userset: { relation: member }
+    editor:
+      union:
+        - this
+        - computed_userset: { relation: admin }
+  org:
+    member:
+      this
+```
+
+This expresses:
+- Anyone with `editor` on a project also has `viewer`.
+- Anyone with `admin` on a project also has `editor` (and transitively `viewer`).
+- Any org `member` is implicitly a `viewer` of org-owned projects via the `parent_org` hop.
+
+### Registering rules in code
+
+```python
+from flametrench_authz import InMemoryTupleStore, ComputedUserset, TupleToUserset
+
+store = InMemoryTupleStore(
+    rules={
+        "proj": {
+            "viewer": [
+                ComputedUserset(relation="editor"),
+                TupleToUserset(
+                    tupleset_relation="parent_org",
+                    computed_userset_relation="member",
+                ),
+            ],
+        },
+    },
+)
+```
+
+For Postgres (v0.3):
+
+```python
+store = PostgresTupleStore(pool=pool, rules=rules)
+```
+
+### Depth and fan-out limits
+
+- Maximum evaluation depth: 8 hops.
+- Maximum fan-out per step: 1024 subjects.
+
+Graphs that exceed either limit raise `EvaluationLimitExceededError`. Rules are SDK/application configuration, not row-level data — store them in code or in an app-managed config table.
 
 ## Patterns for working without rewrite rules
 
-Applications face two patterns for expressing implied grants in v0.1. Both are spec-supported; neither is favored.
+Applications on pure exact-match semantics face two patterns for expressing implied grants. Both are spec-supported; neither is favored.
 
 ### Pattern A — Materialize at state-change time
 
@@ -131,7 +209,7 @@ The application does not materialize implied grants. Instead, `check()` calls pa
 
 ### Mixing patterns
 
-Most real applications use both. Use Pattern A for default grants (org membership implies certain resource grants) and Pattern B for exceptional cases (Carol-the-contractor's per-project scope).
+Most real applications use both. Use Pattern A for default grants (org membership implies certain resource grants) and Pattern B for exceptional cases (Carol-the-contractor's per-project scope). Rewrite rules (v0.2) provide a third path that handles both without bespoke application code.
 
 ## Supporting operations
 
@@ -150,10 +228,12 @@ Enumeration operations MUST paginate with UUIDv7-ordered cursors (seek-based). A
 
 - **Set-form check.** Given `tup_(alice, editor, project_42)`, `check(alice, [viewer, editor], project_42)` MUST return true.
 
-- **No derivation.** Given only `tup_(alice, admin, org_acme)` and no other tuples, `check(alice, editor, org_acme)` MUST return false. The spec does NOT imply `editor` from `admin`.
+- **No implicit derivation.** Given only `tup_(alice, admin, org_acme)` and no other tuples, `check(alice, editor, org_acme)` MUST return false. The spec does NOT imply `editor` from `admin` without rewrite rules.
+
+- **Empty rules equals v0.1.** A store constructed with no rules MUST produce byte-identical results to a v0.1 exact-match store on the same tuple set.
 
 - **Uniqueness of tuples.** Attempting to create a second tuple with identical `(subject_type, subject_id, relation, object_type, object_id)` MUST return an error or be idempotent (returning the existing tuple's ID). Implementations MUST NOT store duplicate rows.
 
 - **Invalid UUID in subject or object.** Any tuple operation that would store `subject_id = ffffffff-ffff-ffff-ffff-ffffffffffff` (Max UUID) or `00000000-0000-0000-0000-000000000000` (Nil UUID) MUST fail; these are not valid Flametrench identifiers per `docs/ids.md`.
 
-More fixtures will land in `spec/conformance/` as implementations surface questions.
+More fixtures are in `spec/conformance/` across three rewrite-rule fixture files covering `computed_userset`, `tuple_to_userset`, and empty-rules-equals-v0.1 cases.

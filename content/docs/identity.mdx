@@ -2,7 +2,7 @@
 
 Flametrench identity covers how a user is represented, how they authenticate, and how authenticated sessions are tracked.
 
-Three entities make up identity in v0.1:
+Three entities make up identity:
 
 - **`usr_`** — a user: the human or service principal whose identity is being managed.
 - **`cred_`** — a credential: one specific way the user can prove they are the user.
@@ -18,10 +18,11 @@ A user is an **opaque identity**. The user entity carries:
 
 - `id` — UUIDv7; rendered on the wire as `usr_<hex>`.
 - `status` — one of `active`, `suspended`, `revoked`.
+- `display_name` — optional human-meaningful render string. Nullable. Added in v0.2 (ADR 0014). See "Display name" below.
 - `created_at` — timestamp of creation, timezone-aware.
 - `updated_at` — timestamp of last modification, timezone-aware.
 
-Implementations MUST NOT require additional fields on `usr_` for spec conformance. Identifiers (email, phone, handle, display name) are application-layer extensions.
+Implementations MUST NOT require additional fields on `usr_` for spec conformance. Identifiers (email, phone, handle) are application-layer extensions and live on `cred_` rows.
 
 ### Lifecycle
 
@@ -39,8 +40,10 @@ suspended → revoked             (terminal)
 
 Implementations MUST provide:
 
-- `createUser() → usr_id` — returns a new `usr_` with `status = active`.
+- `createUser(*, display_name?) → usr_id` — returns a new `usr_` with `status = active`. The optional `display_name` parameter defaults to null.
 - `getUser(usr_id) → user` — returns the entity or a not-found error.
+- `updateUser(usr_id, *, display_name?) → user` — partial-update operation (v0.2, ADR 0014). An omitted field means "no change"; an explicit `null` means "set to null." Suspended users MAY be updated; revoked users MUST NOT (raises `AlreadyTerminalError`).
+- `listUsers(*, cursor?, limit = 50, query?, status?) → Page<User>` — cursor-paginated enumeration (v0.2, ADR 0015). `query` is a case-insensitive substring filter against active credential identifiers; `status` filters by user status. Adopters MUST gate this call site (sysadmin route or equivalent); the SDK does not enforce authorization.
 - `suspendUser(usr_id)` — transitions to `suspended` and terminates sessions.
 - `reinstateUser(usr_id)` — transitions `suspended → active`.
 - `revokeUser(usr_id)` — transitions to `revoked`; triggers the cascade (sessions terminated, credentials revoked).
@@ -55,6 +58,37 @@ cred.usr_id → the user
 ```
 
 Applications MAY cache a denormalized email on their own `usr_` extensions. The spec does not define this.
+
+### Display name (v0.2)
+
+`display_name` is an optional render string for adopter UIs. The spec is intentionally permissive — no length cap, no uniqueness constraint, no required normalization — so adopters can layer their own rules at the application boundary. Two users may share a display name; users are identified by `usr_id`, not by display name.
+
+SHOULD be set when the user has a human-meaningful identity rendered in adopter chrome ("Welcome, Nate"), user-list rows, mention surfaces, or audit logs. Without it, adopters fall back to rendering the credential identifier — which fails for passkey-only users (the credential ID is opaque), OIDC users (the IdP `sub` is opaque), and users with multiple credentials (no deterministic primary).
+
+```python
+identity_store.update_user(usr_id, display_name="Alice Liddell")
+# Clear it:
+identity_store.update_user(usr_id, display_name=None)
+# No-op (field unchanged):
+identity_store.update_user(usr_id)
+```
+
+Suspended users MAY be renamed. Revoked users MUST NOT — `updateUser` raises `AlreadyTerminalError`.
+
+Authorization is unaffected by display-name changes. Tuples reference `usr.id`, never `usr.display_name`.
+
+### User enumeration (v0.2)
+
+```python
+page = identity_store.list_users(
+    identifier_query="alice@",   # matches any active credential identifier
+    status="active",
+    cursor=None, limit=50,
+)
+# page.data: list[User]; page.next_cursor: str | None
+```
+
+Ordering is by `id` ascending (UUIDv7 creation order). Pagination uses seek-based cursors, matching the `listMembers` shape.
 
 ## Credentials
 
@@ -71,7 +105,7 @@ A credential carries:
 - Type-specific payload (below).
 - `created_at`, `updated_at`.
 
-### Credential types in v0.1
+### Credential types
 
 #### Password
 
@@ -146,6 +180,7 @@ A session is an authenticated session of a user:
 - `created_at` — timestamp of creation.
 - `expires_at` — timestamp after which the session is considered expired.
 - `revoked_at` — nullable; if set, the session is revoked.
+- `mfa_verified_at` — nullable; timestamp of the most recent MFA verification on this session (v0.2). Used for step-up auth freshness checks.
 
 The spec does NOT require IP address, user agent, device fingerprint, or geolocation. These are useful for security telemetry but carry PII and jurisdictional concerns; applications MAY add them as extension fields.
 
@@ -153,31 +188,24 @@ The spec does NOT require IP address, user agent, device fingerprint, or geoloca
 
 A session is bound to a `usr_`, not to an `org_`. A user with memberships in multiple orgs uses the same session across all of them; "active org" is a client-side context attribute.
 
-Applications with stricter compliance requirements (e.g., zero-trust banking) MAY enforce org-bound sessions at the application layer by gating each cross-org request with `check()` against the current org. The spec does not mandate this.
+Applications with stricter compliance requirements MAY enforce org-bound sessions at the application layer by gating each cross-org request with `check()` against the current org. The spec does not mandate this.
 
 ### Rotation on refresh
 
 Refreshing a session MUST create a new `ses_` with a new `id` and mark the previous session `revoked_at = now()`. **In-place refresh** — keeping the same `id` and extending `expires_at` — is NOT spec-conformant.
 
-The new session's `cred_id` SHOULD be the same as the previous session's unless the refresh involves re-authentication with a different credential.
-
 ### Session ID versus session token
 
 **The session's `id` is not a secret.** It appears in logs, admin panels, and audit queries. An SDK MUST NOT expose `ses.id` as a bearer credential.
 
-The session's **token** is a separate piece of state derived from `id` plus implementation-specific signing or lookup. Typical patterns:
-
-- **Signed token** (JWT or equivalent) — carries `ses.id` as a claim, signed by the auth service; verification is stateless, requires no database lookup.
-- **Opaque token** — random bearer string indexed against a server-side session table; verification requires a lookup on every request.
-
-Implementations MUST ensure the token's authenticity is verifiable server-side on every authenticated request. The spec does not mandate JWT; both patterns are conformant.
+The session's **token** is a separate piece of state derived from `id` plus implementation-specific signing or lookup. Both signed (JWT-style) and opaque (lookup table) patterns are conformant.
 
 ### Termination
 
 A session terminates when any of the following occur:
 
 - `expires_at` passes.
-- `revokeSession(ses_id)` is called — sets `revoked_at = now()`.
+- `revokeSession(ses_id)` is called.
 - The underlying credential is rotated or revoked (cascades to all sessions bound to it).
 - The user is suspended or revoked (cascades to all their sessions).
 
@@ -188,21 +216,124 @@ A session terminates when any of the following occur:
 - `revokeSession(ses_id)`.
 - `listSessions(usr_id) → [session]`.
 
-## Multi-factor authentication (deferred)
+## Multi-factor authentication (v0.2)
 
-Flametrench v0.1 does NOT specify MFA. See [ADR 0004](../decisions/0004-identity-model.md) for rationale.
+MFA ships as first-class in v0.2 (ADRs 0008 + 0010). Three factor types under the `mfa_` ID prefix:
 
-Applications that need MFA in v0.1 can layer it on:
+- **TOTP** (RFC 6238) — SHA-1/SHA-256/SHA-512. Standard test vectors pinned in conformance.
+- **WebAuthn assertion** — ES256, RS256 (≥2048-bit), and EdDSA (Ed25519). Dispatched from the COSE_Key `alg` field. Signature counter monotonicity enforced per WebAuthn spec §6.1.1 for cloned-authenticator detection.
+- **Recovery codes** — 10 single-use codes in a 31-char alphabet excluding `0/O/1/I/L`.
 
-- Maintain multiple credentials per user (e.g., one password credential and one passkey credential).
-- Require verification of a second credential before calling `createSession`.
-- The resulting session's `cred_id` records the primary credential that established it.
+### MFA policy
 
-v0.2 will introduce first-class MFA with credential chains, grace windows, and recovery codes.
+`usr_mfa_policy` is a per-user enforcement record. When policy is active and the grace window has elapsed, `verifyPassword` surfaces `mfa_required = true` on the returned `VerifiedCredential`. Applications MUST check this flag and route the user to an MFA challenge before minting a session.
+
+### Session-mint flow with MFA
+
+MFA does not mint sessions itself. The application sequences three calls:
+
+```python
+# 1. Verify primary credential
+result = identity_store.verify_password(identifier, candidate)
+# result.mfa_required is True when policy is active and grace window elapsed
+
+# 2. If MFA required, verify a factor
+if result.mfa_required:
+    mfa_ok = identity_store.verify_mfa(usr_id, proof)
+
+# 3. Mint the session
+session = identity_store.create_session(usr_id, cred_id)
+```
+
+### MFA operations
+
+- `enrollMfaFactor(usr_id, type, payload) → mfa_id` — registers a TOTP, WebAuthn, or recovery-code factor. TOTP and WebAuthn require a subsequent confirmation step.
+- `confirmMfaFactor(mfa_id, proof) → mfa` — confirms a pending factor (TOTP code or WebAuthn assertion).
+- `revokeMfaFactor(mfa_id)`.
+- `listMfaFactors(usr_id) → [mfa]`.
+- `verifyMfa(usr_id, proof) → bool` — verifies a presented factor proof.
+- `getMfaPolicy(usr_id) → UserMfaPolicy`.
+- `setMfaPolicy(usr_id, policy)`.
+
+### TOTP helpers
+
+```python
+secret = identity_store.generate_totp_secret()
+uri = identity_store.totp_otpauth_uri(secret, issuer="MyApp", account=email)
+# Display uri as a QR code for the user to scan
+```
+
+### Recovery codes
+
+Recovery codes are generated as a set and stored hashed. Each code is single-use; the store marks it consumed on verify. When a user runs out of codes, issue a new set via `enrollMfaFactor(usr_id, type="recovery")`.
+
+## Personal access tokens (v0.3)
+
+PATs provide non-interactive, long-lived authentication for CLI tools, CI pipelines, and server-to-server calls. They are an alternative to sessions for contexts where browser-based login is unavailable or impractical.
+
+Rationale lives in [ADR 0016 — Personal access tokens](../decisions/0016-personal-access-tokens.md).
+
+### Wire format
+
+PAT bearer tokens use a two-part format:
+
+```
+pat_<32hex-id>_<base64url-secret>
+```
+
+The `pat_<32hex>` portion is the stored ID. The `_<base64url-secret>` suffix is the possession proof — it is the only time the secret is observable; the store persists only its Argon2id hash (at the same parameter floor as password credentials).
+
+### Bearer routing
+
+The authentication middleware checks the prefix of the incoming bearer token and routes to the appropriate verifier:
+
+- `ses_` → session verifier
+- `shr_` → share-token verifier
+- `pat_` → PAT verifier
+
+This prevents cross-type token substitution without per-endpoint configuration.
+
+### Verification semantics (normative ordering)
+
+1. Parse the token into `(id_part, secret_part)` at the last `_` before the base64url run.
+2. Look up the row by `pat_id`. If no row matches, raise `InvalidPatTokenError`.
+3. Argon2id-verify `secret_part` against the stored `secret_hash`. If mismatch, raise `InvalidPatTokenError` (conflated shape — no timing oracle on token presence).
+4. If `revoked_at` is non-null, raise `InvalidPatTokenError`.
+5. If `expires_at` is set and `expires_at <= now`, raise `InvalidPatTokenError`.
+6. Set `last_used_at = now` (best-effort; non-transactional).
+7. Return the verified `usr_id`.
+
+### Lifecycle
+
+```
+active → revoked    (terminal; no suspend)
+```
+
+PATs have no suspend state. Scoping is via the `scope TEXT[]` field — applications define the scope values; the SDK records them but does not evaluate them (application enforces at the call site).
+
+### Operations
+
+- `createPat(usr_id, name, scope?, expires_at?) → { pat, token }` — mints a new PAT. `token` is returned once; store it securely.
+- `listPats(usr_id) → [pat]` — lists all non-revoked PATs for a user.
+- `getPat(pat_id) → pat`.
+- `revokePat(pat_id)`.
+
+### `auth.kind` discriminator
+
+Audit records from v0.3 carry an `auth.kind` field distinguishing the authentication method:
+
+| `auth.kind` | Source |
+|---|---|
+| `session` | A `ses_` bearer token |
+| `share` | A `shr_` share-token verify |
+| `pat` | A `pat_` personal access token |
+| `system` | Internal / unauthenticated system action |
+
+Applications SHOULD log this field alongside the `usr_id` for audit completeness.
 
 ## Conformance fixtures
 
-The following fixtures are REQUIRED for identity interoperability across conforming implementations:
+The following fixtures are REQUIRED for identity interoperability across conforming implementations.
 
 ### Argon2id hash format
 
@@ -211,5 +342,21 @@ A password credential created with the input password `"correcthorsebatterystapl
 ### OIDC subject resolution
 
 Given an OIDC credential with `issuer = "https://accounts.google.com"` and `subject = "1234567890"`, `findCredentialByIdentifier` with the matching `(issuer, subject)` pair MUST return this credential. Issuer URL normalization follows RFC 3986: trailing-slash equivalence is permitted, but case normalization of the host is required.
+
+### MFA TOTP vectors (v0.2)
+
+18 RFC 6238 §B test vectors are pinned in `spec/conformance/identity/mfa/totp-rfc6238.json`. Every SDK MUST pass all 18.
+
+### MFA recovery-code format (v0.2)
+
+Recovery codes MUST be 31 characters from the allowed alphabet (excluding `0/O/1/I/L`). 12 fixture tests in `spec/conformance/identity/mfa/recovery-code-format.json`.
+
+### WebAuthn assertion (v0.2 + v0.3)
+
+7 ES256 + 6 algorithm-dispatch (RS256, EdDSA) tests in `spec/conformance/identity/mfa/webauthn-assertion.json` and `webauthn-assertion-algorithms.json`. Counter-decrease rejection: 4 tests.
+
+### PAT token format (v0.3)
+
+11 structural-validation tests in `spec/conformance/identity/pat/token-format.json` pinning the `pat_<32hex>_<base64url>` wire-format rules.
 
 More conformance fixtures will be added in `spec/conformance/` as implementations surface specific interoperability questions.
