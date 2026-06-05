@@ -15,7 +15,7 @@ export function Nav() {
             <LogoMark size={24} className="text-[color:var(--color-fg)] transition-opacity group-hover:opacity-90" />
             <span className="font-semibold">flametrench</span>
             <span className="rounded border border-[color:var(--color-border)] px-1.5 py-[1px] font-sans text-[10px] uppercase tracking-wider text-[color:var(--color-fg-muted)]">
-              v0.3 · stable
+              Spec v0.3.0 · stable
             </span>
           </Link>
           <nav className="flex items-center gap-6 text-sm text-[color:var(--color-fg-muted)]">
