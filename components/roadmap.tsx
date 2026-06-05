@@ -50,7 +50,7 @@ const milestones: Array<{
       "Audit events (aud_) — tamper-evident operation log (ADR 0019, in progress)",
       "Notifications (not_) — delivery hooks for membership and authz events",
       "File metadata primitive (file_)",
-      "Feature flags (flag_) and billing hooks (sub_)",
+      "Feature flags (flag_)",
     ],
   },
 ];
