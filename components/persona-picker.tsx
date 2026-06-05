@@ -59,7 +59,7 @@ const PERSONAS: Persona[] = [
       "Laravel's broadcasting / queues / scheduler",
     ],
     pitch: [
-      "If you've shipped a Laravel SaaS, you've written the org → membership → invitation flow once already. Flametrench is that code — conformance-tested across four languages, with sole-owner protection, atomic invitation acceptance, and revoke-and-re-add role lifecycle baked in.",
+      "If you've shipped a Laravel SaaS, you've written the org → membership → invitation flow once already. Flametrench is that code — conformance-tested across five languages, with sole-owner protection, atomic invitation acceptance, and revoke-and-re-add role lifecycle baked in.",
       "spatie/laravel-permission gives you $user->hasRole('admin'). Flametrench gives you $store->check($subject, 'admin', 'org', $orgId) — same idea, per-resource grain. The flametrench/laravel package wires it into the service container; on an external IdP, skip flametrench/identity and bridge from your user table.",
     ],
     cta: { label: "Read the PHP SDK docs →", href: "https://github.com/flametrench/authz-php" },
@@ -120,7 +120,7 @@ const PERSONAS: Persona[] = [
     ],
     pitch: [
       "django-guardian's per-object permissions get you most of the way to Flametrench's tuple model. The difference: Flametrench is conformance-tested across four SDKs, so the same authz semantics work whether the call site is Django, FastAPI, or a Node service.",
-      "Postgres-backed stores use psycopg directly — no ORM, no Django framework dependency. Drop them into any Python service. Argon2id is pinned at the OWASP floor and byte-identical across all four SDK families.",
+      "Postgres-backed stores use psycopg directly — no ORM, no Django framework dependency. Drop them into any Python service. Argon2id is pinned at the OWASP floor and byte-identical across all five SDK families.",
     ],
     cta: { label: "Read the Python SDK docs →", href: "https://github.com/flametrench/authz-python" },
   },
@@ -174,7 +174,7 @@ const PERSONAS: Persona[] = [
       "The hand-rolled permission system you'll regret in six months",
     ],
     doesNotReplace: [
-      "Stripe — billing is out of scope for v0.2 (sub_ prefix reserved for v0.3+)",
+      "Stripe — billing is out of scope for v0.3 (sub_ prefix reserved for v0.4+)",
       "Your domain logic — Flametrench is the boring substrate, not your product",
       "Marketing, customer support, or anything else that actually grows the business",
     ],
@@ -204,7 +204,7 @@ const PERSONAS: Persona[] = [
       "Whatever you've cobbled together for permission checks (per-resource tuples, opt-in rewrite rules for role hierarchies, conformance-tested)",
     ],
     doesNotReplace: [
-      "Your audit log infrastructure — aud_ prefix is reserved for v0.3+ but the tenancy operations expose enough metadata (replaces chain, removedBy, terminalBy, terminalAt) to log durably today",
+      "Your audit log infrastructure — aud_ prefix is reserved for v0.4+ (ADR 0019) but the tenancy operations expose enough metadata (replaces chain, removedBy, terminalBy, terminalAt) to log durably today",
       "Your SOC 2 program — but the ADRs document every load-bearing security decision so your auditors don't have to take your word for anything",
       "RLS at the database level — postgres-rls.sql is provided as an optional companion to the reference schema",
     ],
