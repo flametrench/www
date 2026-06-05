@@ -34,15 +34,23 @@ const milestones: Array<{
   },
   {
     version: "v0.3",
-    status: "in-progress",
+    status: "shipped",
     title: "Platform breadth",
     items: [
-      "First-party demo apps showing v0.2 in real flows",
-      "Admin UI reference implementation",
-      "Audit events (aud_) and notifications (not_)",
+      "Personal access tokens (pat_) — long-lived machine credentials (ADR 0016)",
+      "Go SDK family — fifth language, full v0.3 parity (ADR 0018)",
+      "Postgres rewrite-rule evaluation — computed_userset and tuple_to_userset in SQL (ADR 0017)",
+    ],
+  },
+  {
+    version: "v0.4",
+    status: "planned",
+    title: "Observability & extensibility",
+    items: [
+      "Audit events (aud_) — tamper-evident operation log (ADR 0019, in progress)",
+      "Notifications (not_) — delivery hooks for membership and authz events",
       "File metadata primitive (file_)",
       "Feature flags (flag_) and billing hooks (sub_)",
-      "Additional language SDKs as adopter demand emerges",
     ],
   },
 ];

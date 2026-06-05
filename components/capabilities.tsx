@@ -6,8 +6,8 @@ const capabilities = [
     icon: Fingerprint,
     name: "Identity",
     pitch: "Users, sessions, credentials, MFA.",
-    body: "Password, passkey, and OIDC flows behind a single interface. Session rotation and credential revocation as first-class operations — not bolt-ons. v0.2 adds TOTP and WebAuthn (ES256 / RS256 / EdDSA) as first-class factors.",
-    prefixes: ["usr", "ses", "cred", "mfa"],
+    body: "Password, passkey, and OIDC flows behind a single interface. Session rotation and credential revocation as first-class operations — not bolt-ons. v0.2 adds TOTP and WebAuthn (ES256 / RS256 / EdDSA) as first-class factors. v0.3 adds personal access tokens (PATs) for long-lived machine credentials.",
+    prefixes: ["usr", "ses", "cred", "mfa", "pat"],
   },
   {
     icon: Building2,
