@@ -9,7 +9,7 @@ This document is the normative specification for identifiers issued by any Flame
 3. **Storage-friendly.** The storage representation is a standard UUID that every database, ORM, and language already handles natively.
 4. **Collision-resistant without coordination.** Independent processes must be able to generate IDs concurrently without a central coordinator.
 5. **Unambiguous.** No character in the wire format is visually confusable with another. No ambiguity at URL or line boundaries.
-6. **Stable across languages.** A PHP SDK, a Node SDK, and any future SDK must all produce byte-identical encodings for the same type and UUID.
+6. **Stable across languages.** A PHP SDK, a Node SDK, a Go SDK, and any future SDK must all produce byte-identical encodings for the same type and UUID.
 
 ## Storage format
 
@@ -56,25 +56,38 @@ Consistent casing guarantees byte-identical encodings across SDKs and simplifies
 
 ## Type prefix registry
 
-The following type prefixes are reserved for Flametrench v0.1:
+The following type prefixes are currently registered by the specification:
 
-| Prefix | Resource                | Capability     |
-| ------ | ----------------------- | -------------- |
-| `usr`  | User                    | Identity       |
-| `ses`  | Session                 | Identity       |
-| `cred` | Credential              | Identity       |
-| `org`  | Organization            | Tenancy        |
-| `mem`  | Membership              | Tenancy        |
-| `inv`  | Invitation              | Tenancy        |
-| `tup`  | Authorization tuple     | Authorization  |
+| Prefix | Resource                | Capability                               |
+| ------ | ----------------------- | ---------------------------------------- |
+| `usr`  | User                    | Identity                                 |
+| `ses`  | Session                 | Identity                                 |
+| `cred` | Credential              | Identity                                 |
+| `mfa`  | Multi-factor factor     | Identity (v0.2; ADR 0008)                |
+| `org`  | Organization            | Tenancy                                  |
+| `mem`  | Membership              | Tenancy                                  |
+| `inv`  | Invitation              | Tenancy                                  |
+| `tup`  | Authorization tuple     | Authorization                            |
+| `shr`  | Share token             | Authorization (v0.2; ADR 0012)           |
+| `pat`  | Personal access token   | Identity (v0.3; ADR 0016)                |
 
 Implementations MUST NOT invent new type prefixes. New prefixes are added by amending this document through the specification's change process.
 
-Reserved prefixes for future capabilities (not usable in v0.1 implementations):
+### Personal access token wire format (v0.3)
+
+PAT identifiers use a two-part wire format distinct from other types:
+
+```
+pat_<32hex-id>_<base64url-secret>
+```
+
+The `pat_<32hex>` portion is the stored ID (a standard `{type}_{32hex}` Flametrench identifier). The `_<base64url-secret>` suffix carries the opaque secret component that proves possession. The bearer token routing layer recognizes the `pat_` prefix and dispatches to the PAT verifier before session or share verifiers. See [ADR 0016](../decisions/0016-personal-access-tokens.md) and the Identity chapter for the full verification semantics.
+
+Reserved prefixes for future capabilities (not usable in current implementations):
 
 | Prefix  | Planned resource        | Capability      |
 | ------- | ----------------------- | --------------- |
-| `aud`   | Audit event             | Audit (v0.2)    |
+| `aud`   | Audit event             | Audit (v0.4, proposed) |
 | `not`   | Notification            | Notifications   |
 | `file`  | File                    | Files           |
 | `flag`  | Feature flag            | Feature flags   |
@@ -146,4 +159,6 @@ And MUST reject the following inputs as invalid:
 
 ## Change history
 
-- **v0.1 (draft, 2026)** — Initial specification. Registered prefixes for identity, tenancy, authorization. Reserved prefixes for future capabilities. Decoding rule 5 clarified to require version nibble in `[1-8]`, explicitly rejecting Nil and Max UUIDs.
+- **v0.3 (2026)** — Added `pat` prefix for personal access tokens (ADR 0016). Go SDK family added as the fifth first-party implementation (ADR 0018).
+- **v0.2 (2026)** — Added `mfa` and `shr` prefixes (ADRs 0008, 0012). Postgres reference adapters added across all four original SDK families.
+- **v0.1 (2026)** — Initial specification. Registered prefixes for identity, tenancy, authorization.
