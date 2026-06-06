@@ -1,7 +1,7 @@
 ---
 draft: true
-hold: "Publish gated on: (1) SiteSource credit wording — PM will forward, (2) anchor update to docs/security.md#timing-equalization-residual-decoy-verify once Spec PR #50 merges — Security will ping. Version table ✅ Release-confirmed (6f6532e). Release ✅ signed off. Security ✅ signed off (content)."
-review_status: "Version matrix committed (6f6532e). Anchor heading confirmed as #timing-equalization-residual-decoy-verify (Spec PR #50, approved, pending merge). Do not update anchor until PR #50 merges."
+hold: "Publish gated on anchor update: docs/security.md#timing-equalization-residual-decoy-verify — update both refs once Spec PR #50 merges (Security will ping). After anchor commit + Security 5-min confirm: merge and publish. Credit string ✅ 'SiteSource'. Version table ✅ Release-confirmed. Release ✅. Security ✅ content."
+review_status: "All content resolved. Anchor refs still generalized pending PR #50 merge. One commit remaining: update both anchor refs to #timing-equalization-residual-decoy-verify."
 ---
 
 # Security Advisory: User-Enumeration Timing Oracle in `verifyPassword` (FLAMETRENCH-2026-001)
@@ -82,9 +82,9 @@ composer require flametrench/identity:^0.3.1
 npm install @flametrench/identity@0.3.1
 ```
 
-**Python adopters:** no action required. `flametrench-identity` v0.3.0 (the first published release) already contains the fix. No vulnerable artifact was ever published to PyPI.
+**Python adopters:** no action required. `flametrench-identity` v0.3.0 (the first tagged release) already contains the fix. No artifact has been published to PyPI yet.
 
-**Java adopters:** no action required. `dev.flametrench:identity` v0.3.0 (the first published release) already contains the fix. No vulnerable artifact was ever published to Maven Central.
+**Java adopters:** no action required. `dev.flametrench:identity` v0.3.0 (the first tagged release) already contains the fix. No artifact has been published to Maven Central yet.
 
 **Go adopters:** not affected. The Go reference implementation shipped the timing-equalized path from the outset.
 
@@ -114,9 +114,7 @@ npm install @flametrench/identity@0.3.1
 
 ## Credits
 
-Reported by *(credit wording pending coordination with reporter — see note below)*. Remediation verified by the Flametrench security team.
-
-> **Note to editors:** confirm preferred credit wording with the SiteSource reviewer via PM before publishing. Options: named individual, "an external security researcher at SiteSource," or a handle. Do not publish this advisory with this placeholder.
+Reported by SiteSource. Remediation verified by the Flametrench security team.
 
 ---
 
