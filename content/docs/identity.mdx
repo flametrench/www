@@ -283,7 +283,7 @@ pat_<32hex-id>_<base64url-secret>
 
 The `pat_<32hex>` portion is the stored ID. The `_<base64url-secret>` suffix is the possession proof — it is the only time the secret is observable; the store persists only its Argon2id hash (at the same parameter floor as password credentials).
 
-The SDK exports `isStructurallyValidPatToken(token)` (Go: `IsStructurallyValidPatToken`) for adopters that want to pre-screen bearers before dispatch. It validates the regex pattern only — `pat_<32hex>_<base64url-chars>` — with no cap on the secret length. A token with a 300-character secret passes the structural check; it will be rejected at verify-time by the 256-character cap (see step 3 below).
+The SDK exports `isStructurallyValidPatToken(token)` for adopters that want to pre-screen bearers before dispatch. It validates the regex pattern only — `pat_<32hex>_<base64url-chars>` — with no cap on the secret length. A token with a 300-character secret passes the structural check; it will be rejected at verify-time by the 256-character cap (see step 2 below).
 
 ### Bearer routing
 
@@ -299,7 +299,7 @@ This prevents cross-type token substitution without per-endpoint configuration.
 
 1. Parse the token into `(id_part, secret_part)` at the second `_` (the base64url secret component may itself contain `_` characters; splitting on the last `_` would produce an incorrect boundary).
 2. If `len(secret_part) > 256`, raise `InvalidPatTokenError`. This cap is a DoS defense — it prevents a malicious client from passing an arbitrarily large string through Argon2id. Real PAT secrets are 43 characters (32 random bytes, base64url-encoded); 256 leaves a large margin for non-reference implementations.
-3. Look up the row by `pat_id`. If no row matches, run a dummy Argon2id verification against a fixed hash to equalize wall-clock time, then raise `InvalidPatTokenError` (conflated shape — no timing oracle on token presence).
+3. Look up the row by `pat_id`. On any path that would skip the real Argon2id verify (row absent, id not a valid UUIDv7, or over-cap secret from step 2), run a dummy Argon2id verification against the **spec-pinned hash** (ADR 0023 / `security.md`) to keep all branches constant-time, then raise `InvalidPatTokenError`. Every conforming SDK MUST use the same pinned hash string — a self-generated hash with different parameters reintroduces the timing oracle. The conflated error shape prevents a timing oracle on token presence.
 4. If `revoked_at` is non-null, raise `PatRevokedError`.
 5. If `expires_at` is set and `expires_at <= now`, raise `PatExpiredError`.
 6. Argon2id-verify `secret_part` against the stored `secret_hash`. If mismatch, raise `InvalidPatTokenError`.
