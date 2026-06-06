@@ -10,7 +10,7 @@ review_status: "Awaiting Security line-level pass. security.md corrected wording
 **CVSSv3.1:** 5.3 — `AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N`  
 **CWE:** CWE-208 — Observable Timing Discrepancy  
 **OWASP:** A07 — Identification and Authentication Failures  
-**Published:** 2026-06-06 *(hold until PM confirms tags live)*  
+**Published:** 2026-06-06  
 **Not affected:** `github.com/flametrench/flametrench-go/packages/identity` — the Go reference implementation shipped the timing-equalized path from the outset.
 
 > **Environmental note:** Adopters with per-IP rate limiting on sign-in endpoints (required by the Flametrench security model — see `docs/security.md` §Adopter responsibilities) face substantially reduced practical exploitability. Rate limiting does not substitute for upgrading, but is a meaningful environmental control that commonly reduces effective risk to Low.
@@ -19,7 +19,7 @@ review_status: "Awaiting Security line-level pass. security.md corrected wording
 
 ## Summary
 
-The `verifyPassword` operation in the PHP, Node, and Python identity SDK families returned `InvalidCredentialError` immediately when the supplied identifier was not found, without first running Argon2id. The identifier-found path runs a full Argon2id verification (~50–150 ms at floor parameters). The latency difference — approximately 50–100× — is reliably measurable and sufficient for a network attacker to enumerate whether an email address or handle is registered on the system by timing responses.
+The `verifyPassword` operation in the PHP, Node, Python, and Java identity SDK families returned `InvalidCredentialError` immediately when the supplied identifier was not found, without first running Argon2id. The identifier-found path runs a full Argon2id verification (~50–150 ms at floor parameters). The latency difference — approximately 50–100× — is reliably measurable and sufficient for a network attacker to enumerate whether an email address or handle is registered on the system by timing responses.
 
 **What the oracle leaks:** identifier **existence only**. It does not indicate whether the submitted password is correct, does not expose credentials, and does not grant sessions. An attacker learns only that a given identifier is or is not registered.
 
@@ -50,17 +50,17 @@ Timing equalization is exact when all active password credentials use floor Argo
 
 ## Affected versions
 
-| SDK family | Package | Affected | Fixed | Registry availability |
+| SDK family | Package | Affected | Fix | Registry availability |
 |---|---|---|---|---|
 | PHP | `flametrench/identity` (Packagist) | v0.3.0 | v0.3.1 | ✅ Available now |
 | Node | `@flametrench/identity` (npm) | v0.3.0 | v0.3.1 | ⏳ Tagged; npm publish pending |
 | Python | `flametrench-identity` (PyPI) | v0.3.0 | v0.3.1 | ⏳ Tagged; PyPI publish pending |
-| Java | `dev.flametrench:identity` (Maven Central) | v0.3.0 | v0.3.1 | ⏳ Pending tag + Maven Central |
+| Java | `dev.flametrench:identity` (Maven Central) | v0.3.0 | pending release | ⏳ Fix pending tag + Maven Central |
 | Go | `github.com/flametrench/flametrench-go/packages/identity` | Not affected | — | — |
 
-**Only the `identity` package is bumped.** `ids`, `authz`, and `tenancy` remain at v0.3.0 and do not require updating.
+**Only the `identity` package is affected.** `ids`, `authz`, and `tenancy` remain at v0.3.0 and do not require updating.
 
-This advisory will be updated as Node, Python, and Java become installable. Subscribe to release notifications on each SDK repo for availability updates.
+This advisory will be updated as Node, Python, and Java fixes become installable. Subscribe to release notifications on each SDK repo for availability updates.
 
 ---
 
@@ -81,6 +81,8 @@ pip install "flametrench-identity>=0.3.1,<0.4"
 # Java — update dev.flametrench:identity to 0.3.1 in pom.xml / build.gradle once available on Maven Central
 ```
 
+**Java adopters:** the fix is not yet released. In the interim, ensure per-IP rate limiting is enforced on your sign-in endpoint (required by the Flametrench security model — see `docs/security.md` §Adopter responsibilities). Rate limiting does not eliminate the oracle but materially reduces its exploitability by limiting the number of probes per window. Watch for the follow-on v0.3.1 release announcement.
+
 ---
 
 ## Preconditions
@@ -96,16 +98,18 @@ pip install "flametrench-identity>=0.3.1,<0.4"
 
 | Date | Event |
 |---|---|
-| 2026-05-01 | Identified during v0.3.0 pre-release security audit (internal) |
-| 2026-06-05 | Fix implemented across PHP, Node, Python |
-| 2026-06-06 | v0.3.1 tagged (PHP Packagist live; Node/Python publishing pending; Java pending) |
+| ~2026-06-05 | Reported by external security review (SiteSource) |
+| 2026-06-05 | Fix implemented across PHP, Node, Python, Java |
+| 2026-06-06 | v0.3.1 tagged; PHP live on Packagist; Node/Python publish pending; Java pending |
 | 2026-06-06 | Advisory published |
 
 ---
 
 ## Credits
 
-Identified during the Flametrench v0.3.0 pre-release security audit (internal). Remediation verified by the Flametrench security team.
+Reported by *(credit wording pending coordination with reporter — see note below)*. Remediation verified by the Flametrench security team.
+
+> **Note to editors:** confirm preferred credit wording with the SiteSource reviewer via PM before publishing. Options: named individual, "an external security researcher at SiteSource," or a handle. Do not publish this advisory with this placeholder.
 
 ---
 
