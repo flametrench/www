@@ -1,7 +1,7 @@
 ---
 draft: true
-hold: "🚨 VERSION TABLE BLOCKED — do not publish. Affected/fixed versions for Python and Java are materially wrong; Release confirmation pending (Security flagged, looping PM/Release). All other content (oracle, fix, CVSS, residual, preconditions, provenance) signed off by Security. Additional gates: (1) SiteSource credit wording, (2) anchor update pending Security/Spec heading confirmation."
-review_status: "Security content sign-off stands for oracle/fix/CVSS/residual/preconditions/provenance. Version matrix under correction: PHP/Node correct; Python v0.3.0 already fixed (0.3.1 is no-op tag); Java v0.3.0 already fixed (no v0.3.1 exists). Awaiting Release authoritative per-family affected/fixed strings."
+hold: "Publish gated on: (1) SiteSource credit wording — PM will forward, (2) anchor update to real verifyPassword-inclusive heading once Security sends it (Spec security.md generalization in flight). Version table ✅ Release-confirmed. Release ✅ signed off. Security ✅ signed off (content)."
+review_status: "Version matrix confirmed by Release (registry history). PHP v0.3.0 vulnerable ~8h on Packagist; Node/Python/Java no vulnerable release published. Awaiting credit string + final anchor heading."
 ---
 
 # Security Advisory: User-Enumeration Timing Oracle in `verifyPassword` (FLAMETRENCH-2026-001)
@@ -13,17 +13,19 @@ review_status: "Security content sign-off stands for oracle/fix/CVSS/residual/pr
 **Published:** 2026-06-06  
 **Not affected:** `github.com/flametrench/flametrench-go/packages/identity` — the Go reference implementation shipped the timing-equalized path from the outset.
 
-> **Environmental note:** Adopters with per-IP rate limiting on sign-in endpoints (required by the Flametrench security model — see `docs/security.md` §Adopter responsibilities) face substantially reduced practical exploitability. Rate limiting does not substitute for upgrading, but is a meaningful environmental control that commonly reduces effective risk to Low.
+> **Environmental note:** PHP adopters running v0.3.0 who have per-IP rate limiting on sign-in endpoints (required by the Flametrench security model — see `docs/security.md` §Adopter responsibilities) face substantially reduced practical exploitability in the interim. Rate limiting does not substitute for upgrading to v0.3.1, but is a meaningful environmental control that commonly reduces effective risk to Low.
 
 ---
 
 ## Summary
 
-The `verifyPassword` operation in the PHP, Node, Python, and Java identity SDK families returned `InvalidCredentialError` immediately when the supplied identifier was not found, without first running Argon2id. The identifier-found path runs a full Argon2id verification (~50–150 ms at floor parameters). The latency difference — approximately 50–100× — is reliably measurable and sufficient for a network attacker to enumerate whether an email address or handle is registered on the system by timing responses.
+The `verifyPassword` operation in the PHP, Node, Python, and Java identity SDK families contained a timing oracle: the unknown-identifier path returned `InvalidCredentialError` immediately (~1 ms) without running Argon2id, while the identifier-found path ran a full Argon2id verification (~50–150 ms). The latency difference — approximately 50–100× — is reliably measurable and sufficient for a network attacker to enumerate whether an email address or handle is registered on the system by timing responses.
+
+**Released exposure:** of the four affected families, **only PHP published a vulnerable artifact** — Packagist v0.3.0. Node, Python, and Java corrected the defect before their first public registry release: Node and Python's v0.3.0 tags were never published to npm/PyPI; Python and Java's first-ever published v0.3.0 already contains the fix. PHP adopters running v0.3.0 must upgrade; no action is required for Node, Python, or Java adopters.
 
 **What the oracle leaks:** identifier **existence only**. It does not indicate whether the submitted password is correct, does not expose credentials, and does not grant sessions. An attacker learns only that a given identifier is or is not registered.
 
-**Fix (v0.3.1):** the unknown-identifier path now runs a dummy Argon2id verification against the spec-pinned constant hash before returning. Both paths — identifier found and identifier not found — now pay the Argon2id cost. The fix equalizes **upward** (both paths now do Argon2id work); it does not shorten the found path.
+**Fix:** the unknown-identifier path now runs a dummy Argon2id verification against the spec-pinned constant hash before returning. Both paths — identifier found and identifier not found — now pay the Argon2id cost. The fix equalizes **upward** (both paths now do Argon2id work); it does not shorten the found path. The fix ships as PHP/Node v0.3.1; Python and Java's v0.3.0 already incorporates it.
 
 ---
 
@@ -50,38 +52,41 @@ Timing equalization is exact when all active password credentials use floor Argo
 
 ## Affected versions
 
-| SDK family | Package | Affected | Fix | Registry availability |
-|---|---|---|---|---|
-| PHP | `flametrench/identity` (Packagist) | v0.3.0 | v0.3.1 | ✅ Available now |
-| Node | `@flametrench/identity` (npm) | v0.3.0 | v0.3.1 | ⏳ Tagged; npm publish pending |
-| Python | `flametrench-identity` (PyPI) | ⚠️ PENDING RELEASE CONFIRMATION | ⚠️ PENDING | ⚠️ PENDING |
-| Java | `dev.flametrench:identity` (Maven Central) | ⚠️ PENDING RELEASE CONFIRMATION | ⚠️ PENDING | ⚠️ PENDING |
-| Go | `github.com/flametrench/flametrench-go/packages/identity` | Not affected | — | — |
+| SDK family | Package | Vulnerable release published? | Fix |
+|---|---|---|---|
+| PHP | `flametrench/identity` (Packagist) | **Yes — v0.3.0** published to Packagist; live ~8h (2026-06-05 16:04 UTC → 2026-06-06 00:38 UTC) | v0.3.1 ✅ Available now — upgrade required |
+| Node | `@flametrench/identity` (npm) | No — vulnerable v0.3.0 tag was never published to npm | v0.3.1 is the first/only npm release ⏳ publish pending |
+| Python | `flametrench-identity` (PyPI) | No — fix present in the first v0.3.0 release; never published vulnerable | v0.3.0 (v0.3.1 = identical tree) — no action needed |
+| Java | `dev.flametrench:identity` (Maven Central) | No — fix present in the first v0.3.0 release; no v0.3.1 exists | v0.3.0 — no action needed |
+| Go | `github.com/flametrench/flametrench-go/packages/identity` | Never affected | — |
 
-**Only the `identity` package is affected.** `ids`, `authz`, and `tenancy` remain at v0.3.0 and do not require updating.
+**Only the `identity` package is affected.** `ids`, `authz`, and `tenancy` do not require updating.
 
-This advisory will be updated as Node, Python, and Java fixes become installable. Subscribe to release notifications on each SDK repo for availability updates.
+This advisory will be updated when Node v0.3.1 publishes to npm. Subscribe to release notifications on the Node SDK repo for availability updates.
 
 ---
 
 ## Adopter action
 
-**Upgrade to identity v0.3.1 as soon as it is available in your ecosystem.** No API or schema changes — the fix is internal to `verifyPassword`. No data migration required.
+**PHP adopters on v0.3.0 must upgrade to v0.3.1.** No API or schema changes — the fix is internal to `verifyPassword`. No data migration required.
 
 ```bash
-# PHP — available now
+# PHP — upgrade now (v0.3.1 available on Packagist)
 composer require flametrench/identity:^0.3.1
-
-# Node — install once published to npm
-npm install @flametrench/identity@0.3.1
-
-# Python — install once published to PyPI
-pip install "flametrench-identity>=0.3.1,<0.4"
-
-# Java — update dev.flametrench:identity to 0.3.1 in pom.xml / build.gradle once available on Maven Central
 ```
 
-**Java adopters:** ⚠️ Adopter action for Java pending Release confirmation of affected/fixed versions — do not publish this section as-is.
+**Node adopters:** no vulnerable release reached npm. v0.3.1 is the first and only npm release of `@flametrench/identity`. No upgrade needed; install v0.3.1 once it publishes:
+
+```bash
+# Node — install once published to npm (no prior vulnerable version to upgrade from)
+npm install @flametrench/identity@0.3.1
+```
+
+**Python adopters:** no action required. `flametrench-identity` v0.3.0 (the first published release) already contains the fix. No vulnerable artifact was ever published to PyPI.
+
+**Java adopters:** no action required. `dev.flametrench:identity` v0.3.0 (the first published release) already contains the fix. No vulnerable artifact was ever published to Maven Central.
+
+**Go adopters:** not affected. The Go reference implementation shipped the timing-equalized path from the outset.
 
 ---
 
@@ -100,7 +105,9 @@ pip install "flametrench-identity>=0.3.1,<0.4"
 |---|---|
 | 2026-06-05 | Reported by external security review (SiteSource) |
 | 2026-06-05 | Fix implemented across PHP, Node, Python, Java |
-| 2026-06-06 | v0.3.1 tagged; PHP live on Packagist; Node/Python publish pending; Java pending |
+| 2026-06-05 16:04 UTC | PHP identity v0.3.0 (vulnerable) auto-synced to Packagist |
+| 2026-06-06 00:38 UTC | PHP identity v0.3.1 (fixed) supersedes v0.3.0 on Packagist (~8h exposure window) |
+| 2026-06-06 | Node v0.3.1 tagged (npm publish pending — no vulnerable artifact reached npm); Python/Java fix present in existing v0.3.0 release |
 | 2026-06-06 | Advisory published |
 
 ---
