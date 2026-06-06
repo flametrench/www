@@ -1,7 +1,7 @@
 ---
 draft: true
-hold: "Do not publish until PM confirms tags are live."
-review_status: "Awaiting Security line-level pass + corrected security.md wording (Spec). Java fix-status unconfirmed per Release."
+hold: "Publish on Security + Release sign-off. Tags are live (PHP available; Node/Python publishing pending; Java pending tag)."
+review_status: "Awaiting Security line-level pass. security.md corrected wording in flight (Spec)."
 ---
 
 # Security Advisory: User-Enumeration Timing Oracle in `verifyPassword` (FLAMETRENCH-2026-001)
@@ -50,35 +50,36 @@ Timing equalization is exact when all active password credentials use floor Argo
 
 ## Affected versions
 
-| SDK family | Package | Affected | Fixed in |
-|---|---|---|---|
-| PHP | `flametrench/identity` (Packagist) | v0.3.0 | v0.3.1 |
-| Node | `@flametrench/identity` (npm) | v0.3.0 | v0.3.1 |
-| Python | `flametrench-identity` (PyPI) | v0.3.0 | v0.3.1 |
-| Go | `github.com/flametrench/flametrench-go/packages/identity` | Not affected | — |
+| SDK family | Package | Affected | Fixed | Registry availability |
+|---|---|---|---|---|
+| PHP | `flametrench/identity` (Packagist) | v0.3.0 | v0.3.1 | ✅ Available now |
+| Node | `@flametrench/identity` (npm) | v0.3.0 | v0.3.1 | ⏳ Tagged; npm publish pending |
+| Python | `flametrench-identity` (PyPI) | v0.3.0 | v0.3.1 | ⏳ Tagged; PyPI publish pending |
+| Java | `dev.flametrench:identity` (Maven Central) | v0.3.0 | v0.3.1 | ⏳ Pending tag + Maven Central |
+| Go | `github.com/flametrench/flametrench-go/packages/identity` | Not affected | — | — |
 
 **Only the `identity` package is bumped.** `ids`, `authz`, and `tenancy` remain at v0.3.0 and do not require updating.
 
-> **Note:** Java (`dev.flametrench:identity`) v0.3.1 fix status is pending confirmation — this advisory will be updated to include Java once its fix is merged and tagged. Go is not affected.
+This advisory will be updated as Node, Python, and Java become installable. Subscribe to release notifications on each SDK repo for availability updates.
 
 ---
 
 ## Adopter action
 
-**Upgrade to identity v0.3.1.** No API or schema changes — the fix is internal to `verifyPassword`. No data migration required.
+**Upgrade to identity v0.3.1 as soon as it is available in your ecosystem.** No API or schema changes — the fix is internal to `verifyPassword`. No data migration required.
 
 ```bash
-# PHP
+# PHP — available now
 composer require flametrench/identity:^0.3.1
 
-# Node
+# Node — install once published to npm
 npm install @flametrench/identity@0.3.1
 
-# Python
+# Python — install once published to PyPI
 pip install "flametrench-identity>=0.3.1,<0.4"
-```
 
-Java adopters: watch for a follow-on advisory update when `dev.flametrench:identity` v0.3.1 is confirmed tagged.
+# Java — update dev.flametrench:identity to 0.3.1 in pom.xml / build.gradle once available on Maven Central
+```
 
 ---
 
@@ -97,7 +98,8 @@ Java adopters: watch for a follow-on advisory update when `dev.flametrench:ident
 |---|---|
 | 2026-05-01 | Identified during v0.3.0 pre-release security audit (internal) |
 | 2026-06-05 | Fix implemented across PHP, Node, Python |
-| 2026-06-06 | v0.3.1 tagged; advisory published *(hold for PM tag-live confirmation)* |
+| 2026-06-06 | v0.3.1 tagged (PHP Packagist live; Node/Python publishing pending; Java pending) |
+| 2026-06-06 | Advisory published |
 
 ---
 

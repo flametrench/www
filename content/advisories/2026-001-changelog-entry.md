@@ -7,7 +7,7 @@ note: >
   Date: 2026-06-06 (tag date per Release).
 ---
 
-## [v0.3.1] — 2026-06-06 (security)
+## [v0.3.1] — 2026-06-06 (security patch)
 
 ### Fixed
 
