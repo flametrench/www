@@ -1,7 +1,7 @@
 ---
 draft: true
-hold: "Publish gated on: (1) SiteSource reporter credit wording from PM, (2) anchor update once Spec PR #44 merges + Security confirms heading. Release ✅ signed off. Security ✅ signed off (content, 218409a)."
-review_status: "Security content sign-off confirmed. Anchor generalized pending PR #44 merge — Security will ping with final heading."
+hold: "Publish gated on: (1) SiteSource reporter credit wording from PM, (2) anchor update to real heading once Spec generalizes security.md + Security confirms. Release ✅ signed off. Security ✅ signed off (content, 218409a). Spec PR #44 merged (bc1fe3b)."
+review_status: "Security content sign-off confirmed. Anchor generalized; waiting for Security to send final verifyPassword-inclusive heading from Spec's security.md generalization."
 ---
 
 # Security Advisory: User-Enumeration Timing Oracle in `verifyPassword` (FLAMETRENCH-2026-001)
@@ -55,7 +55,7 @@ Timing equalization is exact when all active password credentials use floor Argo
 | PHP | `flametrench/identity` (Packagist) | v0.3.0 | v0.3.1 | ✅ Available now |
 | Node | `@flametrench/identity` (npm) | v0.3.0 | v0.3.1 | ⏳ Tagged; npm publish pending |
 | Python | `flametrench-identity` (PyPI) | v0.3.0 | v0.3.1 | ⏳ Tagged; PyPI publish pending |
-| Java | `dev.flametrench:identity` (Maven Central) | v0.3.0 | pending release | ⏳ Fix pending tag + Maven Central |
+| Java | `dev.flametrench:identity` (Maven Central) | v0.3.0 | v0.3.1 | ⏳ Tagged; Maven Central publish pending |
 | Go | `github.com/flametrench/flametrench-go/packages/identity` | Not affected | — | — |
 
 **Only the `identity` package is affected.** `ids`, `authz`, and `tenancy` remain at v0.3.0 and do not require updating.
@@ -81,7 +81,7 @@ pip install "flametrench-identity>=0.3.1,<0.4"
 # Java — update dev.flametrench:identity to 0.3.1 in pom.xml / build.gradle once available on Maven Central
 ```
 
-**Java adopters:** the fix is not yet released. In the interim, ensure per-IP rate limiting is enforced on your sign-in endpoint (required by the Flametrench security model — see `docs/security.md` §Adopter responsibilities). Rate limiting does not eliminate the oracle but materially reduces its exploitability by limiting the number of probes per window. Watch for the follow-on v0.3.1 release announcement.
+**Java adopters:** v0.3.1 is tagged but not yet available on Maven Central (publish pending). In the interim, ensure per-IP rate limiting is enforced on your sign-in endpoint (required by the Flametrench security model — see `docs/security.md` §Adopter responsibilities). Rate limiting does not eliminate the oracle but materially reduces its exploitability by limiting the number of probes per window. Watch for the Maven Central publish announcement.
 
 ---
 
