@@ -12,6 +12,7 @@ const sections = [
       { label: "Identity", href: "/docs/identity" },
       { label: "Tenancy", href: "/docs/tenancy" },
       { label: "Authorization", href: "/docs/authorization" },
+      { label: "Share Tokens", href: "/docs/shares" },
     ],
   },
   {
