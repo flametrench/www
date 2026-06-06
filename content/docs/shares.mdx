@@ -186,7 +186,7 @@ if verified.relation != "commenter":
     return 403  # viewer-only shares MUST NOT authorize writes
 ```
 
-A common footgun (identified in the v0.3 security audit): minting shares with `relation='viewer'`, building read AND write endpoints behind the same share-auth middleware, and never checking the relation on the write path. The result is silent over-privilege — viewer-only shares authorize writes. Adopters that need distinct intents MUST mint distinct relations and gate each endpoint accordingly.
+A common adopter mistake: building read and write endpoints behind the same share-auth middleware and never re-checking the relation on the write path. The result is silent over-privilege — a share minted with `relation='viewer'` authorizes writes. Adopters that need distinct intents MUST mint distinct relations and gate each endpoint accordingly.
 
 ## What shares are NOT
 
