@@ -1,0 +1,224 @@
+# Share Tokens
+
+A **share** grants the bearer of an opaque token resource-scoped access to a single `(object_type, object_id)` at a given relation. Shares are the v0.2 primitive for time-bounded, presentation-bearer access — file-manager shareable links, view-only invoice URLs, single-use export downloads, and similar flows.
+
+This chapter is normative. Rationale, alternatives considered, and the "what this is NOT" framing live in [ADR 0012 — Share tokens](../decisions/0012-share-tokens.md).
+
+## When to use shares vs. tuples vs. sessions
+
+| You need… | Primitive | Why |
+|---|---|---|
+| Durable "alice can edit doc_42 forever" | `tup` | Tuples are persistent, principal-bound grants. |
+| Bearer authenticates as a user, then permissions follow tuples | `ses` | Sessions establish identity; access is tuple-evaluated. |
+| Bearer holds a token, gets read access to one resource for a window | `shr` | Shares grant resource-scoped access without identity. |
+| Bearer holds a one-time token, gets access exactly once | `shr` with `single_use=True` | Single-use shares consume on first verify. |
+
+Shares do **not** authenticate the bearer. A share-token holder is not a `usr_id`. Hosts that serve resources via verified shares MUST NOT promote share-bearers to authenticated principals — no session minting, no MFA enrollment, no profile edits. The `VerifiedShare` returned by `verify_share_token` is exactly enough information to render one resource at one relation; nothing more.
+
+## Entity shape
+
+- `id` — UUIDv7; wire format `shr_<hex>`.
+- `object_type` — the type prefix of the shared object. MUST match `^[a-z]{2,6}$`.
+- `object_id` — the UUIDv7 of the shared object.
+- `relation` — what the bearer of the token can do. MUST match `^[a-z_]{2,32}$`. The spec does not restrict share issuance to `viewer`-only, but adopters SHOULD limit share relations to read-style access and reject share-bearer-only requests at write-style endpoints.
+- `created_by` — the `usr_id` who minted the share.
+- `expires_at` — required. MUST be in the future at create time. MUST be no more than 365 days from `created_at`. Adopters MAY enforce a tighter cap.
+- `single_use` — boolean. Default `False`. When `True`, the share is consumed on first successful verify.
+- `consumed_at` — nullable timestamp. Set transactionally on first verify when `single_use` is `True`.
+- `revoked_at` — nullable timestamp. Soft-delete; revoked shares fail verify with `ShareRevokedError`.
+- `created_at` — set on insert.
+
+The token itself is **not** part of the entity. The plaintext bearer credential is returned once on `create_share` and never persisted. The SDK stores only the SHA-256 hash of the token, as 32 raw bytes.
+
+## Operations
+
+All examples use `InMemoryShareStore`, the in-memory reference backend. For a Postgres-backed deployment, substitute `PostgresShareStore` from `flametrench_authz.postgres` — the API surface is identical.
+
+```python
+from flametrench_authz import InMemoryShareStore
+
+share_store = InMemoryShareStore()
+```
+
+### `create_share`
+
+```python
+result = share_store.create_share(
+    object_type="doc",
+    object_id="0190f2a8-1b3c-7abc-8123-000000000042",
+    relation="viewer",
+    created_by=usr_id,
+    expires_in_seconds=7 * 24 * 3600,  # one week
+)
+
+share = result.share      # the Share entity; safe to log or persist
+token = result.token      # opaque base64url bearer credential — surface to the recipient NOW
+```
+
+`token` is observable **once only** — the SDK does not retain the plaintext. Pass it to the recipient immediately (e.g. embed in the shareable URL). `share.id` and all other fields are safe to log; `token` MUST NOT be logged.
+
+#### Validation errors
+
+- `expires_in_seconds` zero or negative → `InvalidFormatError("expires_in_seconds")`
+- `expires_in_seconds` exceeds 365 days → `InvalidFormatError("expires_in_seconds")`
+- `relation` does not match `^[a-z_]{2,32}$` → `InvalidFormatError("relation")`
+- `object_type` does not match `^[a-z]{2,6}$` → `InvalidFormatError("object_type")`
+
+#### Single-use shares
+
+```python
+result = share_store.create_share(
+    object_type="export",
+    object_id=export_id,
+    relation="downloader",
+    created_by=usr_id,
+    expires_in_seconds=300,  # 5-minute window
+    single_use=True,
+)
+```
+
+A single-use share is consumed atomically on first verify. Concurrent second verifies receive `ShareConsumedError`, not `InvalidShareTokenError` — the distinction lets adopter audit logs tell "the token was already used" from "the token never existed."
+
+### `verify_share_token`
+
+```python
+from flametrench_authz import (
+    InvalidShareTokenError,
+    ShareConsumedError,
+    ShareExpiredError,
+    ShareRevokedError,
+)
+
+try:
+    verified = share_store.verify_share_token(presented_token)
+except InvalidShareTokenError:
+    return 401  # token not found or hash mismatch
+except ShareRevokedError:
+    return 403  # explicitly revoked
+except ShareConsumedError:
+    return 410  # single-use share already consumed
+except ShareExpiredError:
+    return 410  # past expiry
+
+# verified.object_type, verified.object_id, verified.relation
+if verified.relation != "viewer":
+    return 403  # wrong relation for this endpoint — see "Authz integration" below
+render_resource(verified.object_id)
+```
+
+#### Verification semantics (normative ordering)
+
+1. Hash the input via SHA-256 → 32 bytes.
+2. Look up the row by `token_hash`. If no row matches, raise `InvalidShareTokenError`.
+3. Constant-time-compare the stored hash against the input hash. If mismatch, raise `InvalidShareTokenError`.
+4. If `revoked_at` is non-null, raise `ShareRevokedError`.
+5. If `single_use` is `True` and `consumed_at` is non-null, raise `ShareConsumedError`.
+6. If `expires_at <= now`, raise `ShareExpiredError`.
+7. If `single_use` is `True`: transactionally set `consumed_at = now`. The set MUST be atomic with bearer-acceptance — concurrent verifies of a single-use token MUST yield exactly one success and exactly one `ShareConsumedError`.
+8. Return the `VerifiedShare`.
+
+#### Error precedence
+
+The errors above are listed in normative precedence order. An expired-AND-revoked share raises `ShareRevokedError` (revoke wins — the share has been positively repudiated). An expired-AND-consumed single-use share raises `ShareConsumedError`. The intent: the most-specific failure reason wins, so adopter audit logs can disambiguate "the token was repudiated" from "nobody got there in time."
+
+### `get_share`
+
+```python
+share = share_store.get_share(share_id)
+# ShareNotFoundError if unknown
+```
+
+Read-only fetch by id. No state transitions. Safe to call from admin views, audit endpoints, and dashboards. Returns the full `Share` entity including `consumed_at` and `revoked_at`.
+
+### `revoke_share`
+
+```python
+share = share_store.revoke_share(share_id)
+# Sets revoked_at = now; subsequent verify_share_token raises ShareRevokedError
+```
+
+Idempotent — calling twice on the same id returns the share with the original `revoked_at`; not an error. Future `verify_share_token` calls on any token for this share will raise `ShareRevokedError` regardless of expiry.
+
+### `list_shares_for_object`
+
+```python
+page = share_store.list_shares_for_object(
+    "doc",
+    doc_id,
+    cursor=None,
+    limit=50,
+)
+for share in page.data:
+    print(share.id, share.relation, share.expires_at, share.revoked_at)
+
+if page.next_cursor:
+    next_page = share_store.list_shares_for_object("doc", doc_id, cursor=page.next_cursor)
+```
+
+Enumerates all shares (active, expired, consumed, revoked) for a resource. Ordered by `id` ascending. Useful for admin UIs ("show all share links for this file") and for bulk-revoke workflows.
+
+## Authz integration
+
+`check()` and `check_any()` are unaffected by shares — they continue to consult `tup` rows exclusively. A share does not create a tuple and does not influence tuple-based checks.
+
+The host-side pattern for "render this resource if the token is valid":
+
+```python
+verified = share_store.verify_share_token(presented_token)
+render_resource(verified.object_type, verified.object_id, verified.relation)
+```
+
+The verified handle does NOT pass through `check`. The share verify *is* the authorization decision for that bearer at that resource.
+
+### Adopters MUST enforce the `relation` field
+
+`verify_share_token` returns the relation the share was minted with, but **the adopter MUST check** `verified.relation` against the action being authorized. The SDK only proves the token resolves to a non-revoked, non-expired, non-consumed share for `(object_type, object_id, relation)`. It does not gate by intent.
+
+```python
+# Read endpoint
+verified = share_store.verify_share_token(token)
+if verified.relation not in ("viewer", "commenter"):
+    return 403  # wrong relation for read access
+
+# Write endpoint — must independently check
+verified = share_store.verify_share_token(token)
+if verified.relation != "commenter":
+    return 403  # viewer-only shares MUST NOT authorize writes
+```
+
+A common footgun (identified in the v0.3 security audit): minting shares with `relation='viewer'`, building read AND write endpoints behind the same share-auth middleware, and never checking the relation on the write path. The result is silent over-privilege — viewer-only shares authorize writes. Adopters that need distinct intents MUST mint distinct relations and gate each endpoint accordingly.
+
+## What shares are NOT
+
+- **Not a session.** The bearer is not an authenticated principal. No MFA enrollment, no profile edit, no `usr_id`-bound surfaces.
+- **Not a tuple.** Tuples grant `(usr_alice, viewer, doc_42)` durably to a specific principal. A share grants `viewer on doc_42` to whoever holds the token, until expiry.
+- **Not an invitation.** Invitations create memberships when accepted and require [ADR 0009](../decisions/0009-invitation-accept-binding.md) identifier binding. Shares grant resource access without identity binding.
+- **Not a JWT.** Opaque tokens avoid rotation and algorithm-agility hazards and give simpler revocation. The token is server-resolved against `token_hash`; revocation is a single column update.
+
+## Security considerations
+
+**Token entropy** — the SDK generates at least 32 random bytes (256 bits) of randomness per token, encoded as base64url. `InMemoryShareStore` uses `secrets.token_bytes(32)`; `PostgresShareStore` uses the same path. Implementations MAY use longer tokens; MUST NOT use shorter.
+
+**Constant-time compare** — every `verify_share_token` MUST compare stored hash against input hash via constant-time comparison (`hmac.compare_digest`) after the index lookup, even though the partial-unique index excludes consumed/revoked rows. The defense-in-depth is cheap and prevents timing oracles if the index ever fails to fire.
+
+**Never log the plaintext token.** The `share_id` and `token_hash` are safe to log; the bearer credential is not. `create_share` returns the token in `CreateShareResult.token`; applications MUST surface it to the recipient immediately and discard it.
+
+**Atomic single-use consume** — the spec mandates that `consumed_at` is set within the verify transaction. Implementations MUST NOT use a check-then-set pattern. The reference uses `UPDATE ... WHERE consumed_at IS NULL RETURNING ...` (Postgres) or an equivalent in-memory lock (InMemoryShareStore). A race window between check and set allows two concurrent verifiers to both succeed.
+
+**Lifetime ceiling** — the 365-day ceiling prevents share tokens from devolving into de-facto durable credentials. Adopters with stricter requirements (short-TTL exports, minutes-not-days links) SHOULD enforce a tighter cap at the application layer and communicate it to users via the share-creation UI.
+
+## Storage notes (Postgres)
+
+The reference Postgres schema (`spec/reference/postgres.sql`) places `shr` alongside `tup` in the authorization capability section. Three indexes ship in the reference DDL:
+
+- A partial-unique index on `token_hash` excluding consumed/revoked rows — the verify hot path.
+- A composite index on `(object_type, object_id)` — the `list_shares_for_object` path.
+- A partial index on `expires_at` — operational sweep and cleanup of expired shares.
+
+```python
+from flametrench_authz.postgres import PostgresShareStore
+
+share_store = PostgresShareStore(conn)  # asyncpg or psycopg3 connection
+```
+
+Adopters who do not use shares MAY skip the `shr` DDL; the rest of the v0.2 schema stays byte-identical.
