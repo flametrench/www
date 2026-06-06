@@ -1,7 +1,7 @@
 ---
 draft: true
-hold: "Publish gated on: (1) SiteSource credit wording — PM will forward, (2) anchor update to real verifyPassword-inclusive heading once Security sends it (Spec security.md generalization in flight). Version table ✅ Release-confirmed. Release ✅ signed off. Security ✅ signed off (content)."
-review_status: "Version matrix confirmed by Release (registry history). PHP v0.3.0 vulnerable ~8h on Packagist; Node/Python/Java no vulnerable release published. Awaiting credit string + final anchor heading."
+hold: "Publish gated on: (1) SiteSource credit wording — PM will forward, (2) anchor update to docs/security.md#timing-equalization-residual-decoy-verify once Spec PR #50 merges — Security will ping. Version table ✅ Release-confirmed (6f6532e). Release ✅ signed off. Security ✅ signed off (content)."
+review_status: "Version matrix committed (6f6532e). Anchor heading confirmed as #timing-equalization-residual-decoy-verify (Spec PR #50, approved, pending merge). Do not update anchor until PR #50 merges."
 ---
 
 # Security Advisory: User-Enumeration Timing Oracle in `verifyPassword` (FLAMETRENCH-2026-001)
