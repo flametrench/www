@@ -1,7 +1,7 @@
 ---
 draft: true
-hold: "Publish on Security + Release sign-off. Tags are live (PHP available; Node/Python publishing pending; Java pending tag)."
-review_status: "Awaiting Security line-level pass. security.md corrected wording in flight (Spec)."
+hold: "Publish gated on: (1) SiteSource reporter credit wording from PM, (2) anchor update once Spec PR #44 merges + Security confirms heading. Release ✅ signed off. Security ✅ signed off (content, 218409a)."
+review_status: "Security content sign-off confirmed. Anchor generalized pending PR #44 merge — Security will ping with final heading."
 ---
 
 # Security Advisory: User-Enumeration Timing Oracle in `verifyPassword` (FLAMETRENCH-2026-001)
