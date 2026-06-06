@@ -1,7 +1,7 @@
 ---
 draft: true
-hold: "Awaiting Security 5-min anchor confirm on this commit, then merge + publish. All other gates cleared: credit ✅ 'SiteSource', version table ✅ Release-confirmed, Release ✅, Security ✅ content."
-review_status: "Anchor updated to #timing-equalization-residual-decoy-verify (Spec PR #50 merged bfb00ca). Security confirm pending."
+hold: "READY TO MERGE. All gates cleared: Security ✅ full sign-off (e2358f5), credit ✅ 'SiteSource', version table ✅ Release-confirmed, Release ✅. Anchor converted to plain-text (security.md not served by www). Merge docs/advisory-2026-001 and publish."
+review_status: "All content and editorial gates cleared. Residual refs use plain-text §-style (matches §Adopter-responsibilities pattern; security.md has no www URL). Ready for merge."
 ---
 
 # Security Advisory: User-Enumeration Timing Oracle in `verifyPassword` (FLAMETRENCH-2026-001)
@@ -46,7 +46,7 @@ The spec-pinned hash is the same constant used by the PAT timing defense (ADR 00
 
 ### Residual caveat
 
-Timing equalization is exact when all active password credentials use floor Argon2id parameters (m=19456, t=2, p=1). Adopters who have migrated some credentials to above-floor parameters will have real verifications taking slightly longer than the dummy — leaving a residual, coarser timing signal bounded by the above-floor parameter increment. See `docs/security.md` [§ Timing-equalization residual (decoy verify)](docs/security.md#timing-equalization-residual-decoy-verify) for the characterization of the residual and available mitigations.
+Timing equalization is exact when all active password credentials use floor Argon2id parameters (m=19456, t=2, p=1). Adopters who have migrated some credentials to above-floor parameters will have real verifications taking slightly longer than the dummy — leaving a residual, coarser timing signal bounded by the above-floor parameter increment. See `docs/security.md` §Timing-equalization residual (decoy verify) for the characterization of the residual and available mitigations.
 
 ---
 
@@ -122,5 +122,5 @@ Reported by SiteSource. Remediation verified by the Flametrench security team.
 
 - [CWE-208: Observable Timing Discrepancy](https://cwe.mitre.org/data/definitions/208.html)
 - OWASP Top 10 A07:2021 — Identification and Authentication Failures
-- Flametrench `docs/security.md` — [§ Timing-equalization residual (decoy verify)](docs/security.md#timing-equalization-residual-decoy-verify)
+- Flametrench `docs/security.md` §Timing-equalization residual (decoy verify)
 - ADR 0023 — spec-pinned dummy-hash primitive (PAT timing defense, same mechanism)
