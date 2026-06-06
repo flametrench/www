@@ -44,7 +44,7 @@ The spec-pinned hash is the same constant used by the PAT timing defense (ADR 00
 
 ### Residual caveat
 
-Timing equalization is exact when all active password credentials use floor Argon2id parameters (m=19456, t=2, p=1). Adopters who have migrated some credentials to above-floor parameters will have real verifications taking slightly longer than the dummy — leaving a residual, coarser timing signal bounded by the above-floor parameter increment. See `docs/security.md` §verifyPassword timing equalization for the characterization of the residual and available mitigations.
+Timing equalization is exact when all active password credentials use floor Argon2id parameters (m=19456, t=2, p=1). Adopters who have migrated some credentials to above-floor parameters will have real verifications taking slightly longer than the dummy — leaving a residual, coarser timing signal bounded by the above-floor parameter increment. See `docs/security.md` (timing-equalization residual and available mitigations — section forthcoming pending Spec PR #44).
 
 ---
 
@@ -117,5 +117,5 @@ Reported by *(credit wording pending coordination with reporter — see note bel
 
 - [CWE-208: Observable Timing Discrepancy](https://cwe.mitre.org/data/definitions/208.html)
 - OWASP Top 10 A07:2021 — Identification and Authentication Failures
-- Flametrench `docs/security.md` — §verifyPassword timing equalization
+- Flametrench `docs/security.md` — timing-equalization residual (section forthcoming pending Spec PR #44)
 - ADR 0023 — spec-pinned dummy-hash primitive (PAT timing defense, same mechanism)
