@@ -98,7 +98,7 @@ pip install "flametrench-identity>=0.3.1,<0.4"
 
 | Date | Event |
 |---|---|
-| ~2026-06-05 | Reported by external security review (SiteSource) |
+| 2026-06-05 | Reported by external security review (SiteSource) |
 | 2026-06-05 | Fix implemented across PHP, Node, Python, Java |
 | 2026-06-06 | v0.3.1 tagged; PHP live on Packagist; Node/Python publish pending; Java pending |
 | 2026-06-06 | Advisory published |
