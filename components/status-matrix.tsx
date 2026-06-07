@@ -41,7 +41,7 @@ const ROWS: Row[] = [
       node: { version: "v0.3.0", channel: "live" },
       php: { version: "v0.3.0", channel: "live" },
       python: { version: "v0.3.0", channel: "live" },
-      java: { version: "v0.3.0", channel: "pending" },
+      java: { version: "v0.3.0", channel: "live" },
       go: { version: "v0.3.2", channel: "live" },
     },
   },
@@ -52,7 +52,7 @@ const ROWS: Row[] = [
       node: { version: "v0.3.1", channel: "live" },
       php: { version: "v0.3.1", channel: "live" },
       python: { version: "v0.3.0", channel: "live" },
-      java: { version: "v0.3.0", channel: "pending" },
+      java: { version: "v0.3.0", channel: "live" },
       go: { version: "v0.3.2", channel: "live" },
     },
   },
@@ -63,7 +63,7 @@ const ROWS: Row[] = [
       node: { version: "v0.3.0", channel: "live" },
       php: { version: "v0.3.0", channel: "live" },
       python: { version: "v0.3.0", channel: "live" },
-      java: { version: "v0.3.0", channel: "pending" },
+      java: { version: "v0.3.0", channel: "live" },
       go: { version: "v0.3.2", channel: "live" },
     },
   },
@@ -74,7 +74,7 @@ const ROWS: Row[] = [
       node: { version: "v0.3.0", channel: "live" },
       php: { version: "v0.3.0", channel: "live" },
       python: { version: "v0.3.0", channel: "live" },
-      java: { version: "v0.3.0", channel: "pending" },
+      java: { version: "v0.3.0", channel: "live" },
       go: { version: "v0.3.2", channel: "live" },
     },
   },
@@ -166,7 +166,7 @@ export function StatusMatrix() {
             Package × language × registry.
           </h2>
           <p className="mt-4 text-[color:var(--color-fg-muted)]">
-            The specification is at <span className="font-medium text-[color:var(--color-fg)]">v0.3.0 · stable</span>. Go (v0.3.2), PHP, Node, and Python all ship the v0.3 contract and are live on their registries — identity is at v0.3.1 on Node and PHP (CWE-208 timing-oracle patch). Java&apos;s v0.3.0 is tagged and pending Maven Central publication.
+            The specification is at <span className="font-medium text-[color:var(--color-fg)]">v0.3.0 · stable</span>. All five SDK families ship the v0.3 contract and are live on their registries — identity is at v0.3.1 on Node and PHP (CWE-208 timing-oracle patch); Java published to Maven Central at v0.3.0.
           </p>
         </div>
 
