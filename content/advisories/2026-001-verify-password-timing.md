@@ -1,5 +1,6 @@
 ---
-ghsa: "GHSA-33cx-f9xx-h6ff"
+ghsa_php: "GHSA-33cx-f9xx-h6ff"
+ghsa_node: "GHSA-c2mw-3mpc-c5mj"
 updated: "2026-06-06 — (1) PHP affected range corrected: v0.3.0 → all releases < 0.3.1. (2) Node row corrected: @flametrench/identity 0.2.0 and 0.2.1 are live on npm and contain the oracle; no fixed version on npm yet."
 ---
 
@@ -122,7 +123,7 @@ Reported by SiteSource. Remediation verified by the Flametrench security team.
 ## References
 
 - `GHSA-33cx-f9xx-h6ff` — GitHub Security Advisory (PHP identity; link forthcoming — publication pending)
-- Node GHSA — pending filing and publication (npm ecosystem; `@flametrench/identity < 0.3.1`)
+- `GHSA-c2mw-3mpc-c5mj` — GitHub Security Advisory (Node identity; link forthcoming — publication pending)
 - [CWE-208: Observable Timing Discrepancy](https://cwe.mitre.org/data/definitions/208.html)
 - OWASP Top 10 A07:2021 — Identification and Authentication Failures
 - Flametrench `docs/security.md` §Timing-equalization residual (decoy verify)
