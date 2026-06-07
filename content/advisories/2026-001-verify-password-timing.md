@@ -1,5 +1,6 @@
 ---
 ghsa: "GHSA-33cx-f9xx-h6ff"
+updated: "2026-06-06 — PHP affected range corrected: v0.3.0 → all releases < 0.3.1 (oracle present since v0.0.1)"
 ---
 
 # Security Advisory: User-Enumeration Timing Oracle in `verifyPassword` (FLAMETRENCH-2026-001)
@@ -11,7 +12,9 @@ ghsa: "GHSA-33cx-f9xx-h6ff"
 **Published:** 2026-06-06  
 **Not affected:** `github.com/flametrench/flametrench-go/packages/identity` — the Go reference implementation shipped the timing-equalized path from the outset.
 
-> **Environmental note:** PHP adopters running v0.3.0 who have per-IP rate limiting on sign-in endpoints (required by the Flametrench security model — see `docs/security.md` §Adopter responsibilities) face substantially reduced practical exploitability in the interim. Rate limiting does not substitute for upgrading to v0.3.1, but is a meaningful environmental control that commonly reduces effective risk to Low.
+> **Updated 2026-06-06:** The PHP affected range has been corrected. The `verifyPassword` timing oracle is present in all PHP identity releases `< 0.3.1` (v0.0.1 through v0.3.0), not only v0.3.0 as initially stated. The fix version (v0.3.1), family-level exposure story, and all other content are unchanged.
+
+> **Environmental note:** PHP adopters on any version `< 0.3.1` who have per-IP rate limiting on sign-in endpoints (required by the Flametrench security model — see `docs/security.md` §Adopter responsibilities) face substantially reduced practical exploitability in the interim. Rate limiting does not substitute for upgrading to v0.3.1, but is a meaningful environmental control that commonly reduces effective risk to Low.
 
 ---
 
@@ -19,7 +22,7 @@ ghsa: "GHSA-33cx-f9xx-h6ff"
 
 The `verifyPassword` operation in the PHP, Node, Python, and Java identity SDK families contained a timing oracle: the unknown-identifier path returned `InvalidCredentialError` immediately (~1 ms) without running Argon2id, while the identifier-found path ran a full Argon2id verification (~50–150 ms). The latency difference — approximately 50–100× — is reliably measurable and sufficient for a network attacker to enumerate whether an email address or handle is registered on the system by timing responses.
 
-**Released exposure:** of the four affected families, **only PHP published a vulnerable artifact** — Packagist v0.3.0. Node, Python, and Java corrected the defect before their first public registry release: Node and Python's v0.3.0 tags were never published to npm/PyPI; Python and Java's first-ever published v0.3.0 already contains the fix. PHP adopters running v0.3.0 must upgrade; no action is required for Node, Python, or Java adopters.
+**Released exposure:** of the four affected families, **only PHP published vulnerable artifacts** — all Packagist releases `< 0.3.1` (v0.0.1 through v0.3.0). The `verifyPassword` oracle predates v0.3 and every pre-fix tag auto-synced to Packagist. Node, Python, and Java corrected the defect before their first public registry release. PHP adopters on any version below v0.3.1 must upgrade; no action is required for Node, Python, or Java adopters.
 
 **What the oracle leaks:** identifier **existence only**. It does not indicate whether the submitted password is correct, does not expose credentials, and does not grant sessions. An attacker learns only that a given identifier is or is not registered.
 
@@ -52,7 +55,7 @@ Timing equalization is exact when all active password credentials use floor Argo
 
 | SDK family | Package | Vulnerable release published? | Fix |
 |---|---|---|---|
-| PHP | `flametrench/identity` (Packagist) | **Yes — v0.3.0** published to Packagist; live ~8h (2026-06-05 16:04 UTC → 2026-06-06 00:38 UTC) | v0.3.1 ✅ Available now — upgrade required |
+| PHP | `flametrench/identity` (Packagist) | **Yes — all releases `< 0.3.1`** (v0.0.1 through v0.3.0; oracle predates v0.3 and every pre-fix tag auto-synced to Packagist). v0.3.0 was the last, live ~8h 2026-06-05 16:04→2026-06-06 00:38 UTC | **v0.3.1** ✅ Available now — upgrade required |
 | Node | `@flametrench/identity` (npm) | No — vulnerable v0.3.0 tag was never published to npm | v0.3.1 is the first/only npm release ⏳ publish pending |
 | Python | `flametrench-identity` (PyPI) | No — fix present in the first v0.3.0 release; never published vulnerable | v0.3.0 (v0.3.1 = identical tree) — no action needed |
 | Java | `dev.flametrench:identity` (Maven Central) | No — fix present in the first v0.3.0 release; no v0.3.1 exists | v0.3.0 — no action needed |
@@ -66,7 +69,7 @@ This advisory will be updated when Node v0.3.1 publishes to npm. Subscribe to re
 
 ## Adopter action
 
-**PHP adopters on v0.3.0 must upgrade to v0.3.1.** No API or schema changes — the fix is internal to `verifyPassword`. No data migration required.
+**PHP adopters on any version below v0.3.1 must upgrade to v0.3.1.** The `verifyPassword` timing oracle is present in all releases from v0.0.1 through v0.3.0. No API or schema changes — the fix is internal to `verifyPassword`. No data migration required.
 
 ```bash
 # PHP — upgrade now (v0.3.1 available on Packagist)
