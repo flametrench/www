@@ -121,8 +121,8 @@ Reported by SiteSource. Remediation verified by the Flametrench security team.
 
 ## References
 
-- [GHSA-33cx-f9xx-h6ff](https://github.com/flametrench/identity-php/security/advisories/GHSA-33cx-f9xx-h6ff) — GitHub Security Advisory (PHP identity)
-- Node GHSA — pending filing (npm ecosystem; `@flametrench/identity < 0.3.1`)
+- `GHSA-33cx-f9xx-h6ff` — GitHub Security Advisory (PHP identity; link forthcoming — publication pending)
+- Node GHSA — pending filing and publication (npm ecosystem; `@flametrench/identity < 0.3.1`)
 - [CWE-208: Observable Timing Discrepancy](https://cwe.mitre.org/data/definitions/208.html)
 - OWASP Top 10 A07:2021 — Identification and Authentication Failures
 - Flametrench `docs/security.md` §Timing-equalization residual (decoy verify)
