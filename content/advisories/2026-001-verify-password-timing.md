@@ -1,7 +1,5 @@
 ---
-draft: true
-hold: "READY TO MERGE. All gates cleared: Security ✅ full sign-off (e2358f5), credit ✅ 'SiteSource', version table ✅ Release-confirmed, Release ✅. Anchor converted to plain-text (security.md not served by www). Merge docs/advisory-2026-001 and publish."
-review_status: "All content and editorial gates cleared. Residual refs use plain-text §-style (matches §Adopter-responsibilities pattern; security.md has no www URL). Ready for merge."
+ghsa: "GHSA-33cx-f9xx-h6ff"
 ---
 
 # Security Advisory: User-Enumeration Timing Oracle in `verifyPassword` (FLAMETRENCH-2026-001)
@@ -120,6 +118,7 @@ Reported by SiteSource. Remediation verified by the Flametrench security team.
 
 ## References
 
+- [GHSA-33cx-f9xx-h6ff](https://github.com/flametrench/identity-php/security/advisories/GHSA-33cx-f9xx-h6ff) — GitHub Security Advisory (PHP identity)
 - [CWE-208: Observable Timing Discrepancy](https://cwe.mitre.org/data/definitions/208.html)
 - OWASP Top 10 A07:2021 — Identification and Authentication Failures
 - Flametrench `docs/security.md` §Timing-equalization residual (decoy verify)
