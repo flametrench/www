@@ -1,6 +1,6 @@
 ---
 ghsa: "GHSA-33cx-f9xx-h6ff"
-updated: "2026-06-06 — PHP affected range corrected: v0.3.0 → all releases < 0.3.1 (oracle present since v0.0.1)"
+updated: "2026-06-06 — (1) PHP affected range corrected: v0.3.0 → all releases < 0.3.1. (2) Node row corrected: @flametrench/identity 0.2.0 and 0.2.1 are live on npm and contain the oracle; no fixed version on npm yet."
 ---
 
 # Security Advisory: User-Enumeration Timing Oracle in `verifyPassword` (FLAMETRENCH-2026-001)
@@ -12,9 +12,9 @@ updated: "2026-06-06 — PHP affected range corrected: v0.3.0 → all releases <
 **Published:** 2026-06-06  
 **Not affected:** `github.com/flametrench/flametrench-go/packages/identity` — the Go reference implementation shipped the timing-equalized path from the outset.
 
-> **Updated 2026-06-06:** The PHP affected range has been corrected. The `verifyPassword` timing oracle is present in all PHP identity releases `< 0.3.1` (v0.0.1 through v0.3.0), not only v0.3.0 as initially stated. The fix version (v0.3.1), family-level exposure story, and all other content are unchanged.
+> **Updated 2026-06-06:** Two corrections. (1) The PHP affected range has been widened: the oracle is present in all PHP identity releases `< 0.3.1` (v0.0.1 through v0.3.0), not only v0.3.0 as initially stated. (2) The Node row has been corrected: `@flametrench/identity` 0.2.0 and 0.2.1 are live on npm and contain the oracle. No fixed version is yet available on npm. Node adopters should apply the interim rate-limiting mitigation while awaiting the npm publish of v0.3.1.
 
-> **Environmental note:** PHP adopters on any version `< 0.3.1` who have per-IP rate limiting on sign-in endpoints (required by the Flametrench security model — see `docs/security.md` §Adopter responsibilities) face substantially reduced practical exploitability in the interim. Rate limiting does not substitute for upgrading to v0.3.1, but is a meaningful environmental control that commonly reduces effective risk to Low.
+> **Environmental note:** PHP adopters on any version `< 0.3.1`, and Node adopters on `@flametrench/identity` 0.2.x (no fixed version available on npm yet), who have per-IP rate limiting on sign-in endpoints (required by the Flametrench security model — see `docs/security.md` §Adopter responsibilities) face substantially reduced practical exploitability. Rate limiting does not substitute for upgrading, but is a meaningful environmental control that commonly reduces effective risk to Low.
 
 ---
 
@@ -22,7 +22,7 @@ updated: "2026-06-06 — PHP affected range corrected: v0.3.0 → all releases <
 
 The `verifyPassword` operation in the PHP, Node, Python, and Java identity SDK families contained a timing oracle: the unknown-identifier path returned `InvalidCredentialError` immediately (~1 ms) without running Argon2id, while the identifier-found path ran a full Argon2id verification (~50–150 ms). The latency difference — approximately 50–100× — is reliably measurable and sufficient for a network attacker to enumerate whether an email address or handle is registered on the system by timing responses.
 
-**Released exposure:** of the four affected families, **only PHP published vulnerable artifacts** — all Packagist releases `< 0.3.1` (v0.0.1 through v0.3.0). The `verifyPassword` oracle predates v0.3 and every pre-fix tag auto-synced to Packagist. Node, Python, and Java corrected the defect before their first public registry release. PHP adopters on any version below v0.3.1 must upgrade; no action is required for Node, Python, or Java adopters.
+**Released exposure:** **PHP and Node both published vulnerable artifacts.** PHP: all Packagist releases `< 0.3.1` (v0.0.1 through v0.3.0); the oracle predates v0.3 and every pre-fix tag auto-synced to Packagist. Node: `@flametrench/identity` 0.2.0 and 0.2.1 are live on npm (`latest` = 0.2.1); **no fixed version is currently available on npm** — v0.3.1 is tagged but not yet published. Python and Java corrected the defect before their first public registry release. PHP adopters on any version below v0.3.1 must upgrade immediately. Node adopters should apply the interim rate-limiting mitigation and watch for the npm publish of v0.3.1.
 
 **What the oracle leaks:** identifier **existence only**. It does not indicate whether the submitted password is correct, does not expose credentials, and does not grant sessions. An attacker learns only that a given identifier is or is not registered.
 
@@ -56,14 +56,14 @@ Timing equalization is exact when all active password credentials use floor Argo
 | SDK family | Package | Vulnerable release published? | Fix |
 |---|---|---|---|
 | PHP | `flametrench/identity` (Packagist) | **Yes — all releases `< 0.3.1`** (v0.0.1 through v0.3.0; oracle predates v0.3 and every pre-fix tag auto-synced to Packagist). v0.3.0 was the last, live ~8h 2026-06-05 16:04→2026-06-06 00:38 UTC | **v0.3.1** ✅ Available now — upgrade required |
-| Node | `@flametrench/identity` (npm) | No — vulnerable v0.3.0 tag was never published to npm | v0.3.1 is the first/only npm release ⏳ publish pending |
+| Node | `@flametrench/identity` (npm) | **Yes — 0.2.0 and 0.2.1** live on npm (`latest` = 0.2.1); both contain the oracle (`< 0.3.1`) | v0.3.1 (tagged; **npm publish pending — no fixed version on npm yet**) |
 | Python | `flametrench-identity` (PyPI) | No — fix present in the first v0.3.0 release; never published vulnerable | v0.3.0 (v0.3.1 = identical tree) — no action needed |
 | Java | `dev.flametrench:identity` (Maven Central) | No — fix present in the first v0.3.0 release; no v0.3.1 exists | v0.3.0 — no action needed |
 | Go | `github.com/flametrench/flametrench-go/packages/identity` | Never affected | — |
 
 **Only the `identity` package is affected.** `ids`, `authz`, and `tenancy` do not require updating.
 
-This advisory will be updated when Node v0.3.1 publishes to npm. Subscribe to release notifications on the Node SDK repo for availability updates.
+This advisory will be updated when Node v0.3.1 publishes to npm and when the Node GHSA is filed. Subscribe to release notifications on the Node SDK repo for availability updates.
 
 ---
 
@@ -76,10 +76,10 @@ This advisory will be updated when Node v0.3.1 publishes to npm. Subscribe to re
 composer require flametrench/identity:^0.3.1
 ```
 
-**Node adopters:** no vulnerable release reached npm. v0.3.1 is the first and only npm release of `@flametrench/identity`. No upgrade needed; install v0.3.1 once it publishes:
+**Node adopters on `@flametrench/identity` 0.2.x are exposed — no fixed version is currently available on npm.** The fix (v0.3.1) is tagged but not yet published to npm. In the interim, ensure per-IP rate limiting is enforced on your sign-in endpoint (required by the Flametrench security model — see `docs/security.md` §Adopter responsibilities). Rate limiting does not eliminate the oracle but materially reduces exploitability. Upgrade to v0.3.1 the moment it publishes:
 
 ```bash
-# Node — install once published to npm (no prior vulnerable version to upgrade from)
+# Node — upgrade once v0.3.1 publishes to npm
 npm install @flametrench/identity@0.3.1
 ```
 
@@ -122,6 +122,7 @@ Reported by SiteSource. Remediation verified by the Flametrench security team.
 ## References
 
 - [GHSA-33cx-f9xx-h6ff](https://github.com/flametrench/identity-php/security/advisories/GHSA-33cx-f9xx-h6ff) — GitHub Security Advisory (PHP identity)
+- Node GHSA — pending filing (npm ecosystem; `@flametrench/identity < 0.3.1`)
 - [CWE-208: Observable Timing Discrepancy](https://cwe.mitre.org/data/definitions/208.html)
 - OWASP Top 10 A07:2021 — Identification and Authentication Failures
 - Flametrench `docs/security.md` §Timing-equalization residual (decoy verify)
