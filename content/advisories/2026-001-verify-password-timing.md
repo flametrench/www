@@ -108,7 +108,7 @@ npm install @flametrench/identity@0.3.1
 | 2026-06-05 | Fix implemented across PHP, Node, Python, Java |
 | 2026-06-05 16:04 UTC | PHP identity v0.3.0 (vulnerable) auto-synced to Packagist |
 | 2026-06-06 00:38 UTC | PHP identity v0.3.1 (fixed) supersedes v0.3.0 on Packagist (~8h exposure window) |
-| 2026-06-06 | Node v0.3.1 tagged (npm publish pending — no vulnerable artifact reached npm); Python/Java fix present in existing v0.3.0 release |
+| 2026-06-06 | Node v0.3.1 tagged; npm publish pending — vulnerable 0.2.0/0.2.1 remain the npm `latest` until 0.3.1 publishes. Python/Java fix present in existing v0.3.0 release |
 | 2026-06-06 | Advisory published |
 
 ---
