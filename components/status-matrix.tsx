@@ -11,14 +11,16 @@ import { Container } from "./container";
 // ON THE NAMED REGISTRY (any dist-tag — `latest` OR `rc`). "live" =
 // installable today via `npm install @flametrench/<pkg>@<version>`,
 // `composer require flametrench/<pkg>:<version>`, etc. "pending" =
-// shipped locally but not yet on the registry. Verify with
-// `npm view @flametrench/<pkg> versions --json` (note the plural —
-// singular `version` returns only the `latest` dist-tag, missing
-// RCs published under `rc` / `next`). PHP/Packagist auto-syncs
-// from git tags. PyPI/Maven publishing blocked on org/credential
-// approvals.
+// shipped locally but not yet on the registry. "rc" = published under
+// a pre-release dist-tag (e.g. `go get flametrench@v0.3.0-rc.1`).
+// Verify with `npm view @flametrench/<pkg> versions --json` (note the
+// plural — singular `version` returns only the `latest` dist-tag,
+// missing RCs published under `rc` / `next`). PHP/Packagist auto-syncs
+// from git tags. Python publishes via Trusted Publishing (PyPI).
+// Java publishes to Maven Central — cells flip pending → live once the
+// publish job runs.
 
-type ChannelState = "live" | "pending" | "planned";
+type ChannelState = "live" | "rc" | "pending" | "planned";
 
 interface Cell {
   version: string;
@@ -28,7 +30,7 @@ interface Cell {
 interface Row {
   pkg: string;
   blurb: string;
-  cells: { node: Cell; php: Cell; python: Cell; java: Cell };
+  cells: { node: Cell; php: Cell; python: Cell; java: Cell; go: Cell };
 }
 
 const ROWS: Row[] = [
@@ -36,40 +38,44 @@ const ROWS: Row[] = [
     pkg: "ids",
     blurb: "Wire-format identifiers (UUIDv7, prefixed).",
     cells: {
-      node: { version: "v0.2.0", channel: "live" },
-      php: { version: "v0.2.0", channel: "live" },
-      python: { version: "v0.2.0", channel: "pending" },
+      node: { version: "v0.3.0", channel: "live" },
+      php: { version: "v0.3.0", channel: "live" },
+      python: { version: "v0.3.0", channel: "live" },
       java: { version: "v0.3.0", channel: "pending" },
+      go: { version: "v0.3.2", channel: "live" },
     },
   },
   {
     pkg: "identity",
     blurb: "Users, credentials, sessions, MFA, display name, listUsers.",
     cells: {
-      node: { version: "v0.2.1", channel: "live" },
-      php: { version: "v0.2.0", channel: "live" },
-      python: { version: "v0.2.0", channel: "pending" },
+      node: { version: "v0.3.1", channel: "live" },
+      php: { version: "v0.3.1", channel: "live" },
+      python: { version: "v0.3.0", channel: "live" },
       java: { version: "v0.3.0", channel: "pending" },
+      go: { version: "v0.3.2", channel: "live" },
     },
   },
   {
     pkg: "tenancy",
     blurb: "Organizations, memberships, invitations.",
     cells: {
-      node: { version: "v0.2.1", channel: "live" },
-      php: { version: "v0.2.0", channel: "live" },
-      python: { version: "v0.2.0", channel: "pending" },
+      node: { version: "v0.3.0", channel: "live" },
+      php: { version: "v0.3.0", channel: "live" },
+      python: { version: "v0.3.0", channel: "live" },
       java: { version: "v0.3.0", channel: "pending" },
+      go: { version: "v0.3.2", channel: "live" },
     },
   },
   {
     pkg: "authz",
     blurb: "Tuples, check(), rewrite rules, share tokens.",
     cells: {
-      node: { version: "v0.2.1", channel: "live" },
-      php: { version: "v0.2.0", channel: "live" },
-      python: { version: "v0.2.0", channel: "pending" },
+      node: { version: "v0.3.0", channel: "live" },
+      php: { version: "v0.3.0", channel: "live" },
+      python: { version: "v0.3.0", channel: "live" },
       java: { version: "v0.3.0", channel: "pending" },
+      go: { version: "v0.3.2", channel: "live" },
     },
   },
 ];
@@ -82,6 +88,12 @@ const CHANNEL_META: Record<
     label: "Live",
     icon: CheckCircle2,
     iconClass: "text-emerald-400",
+    cellClass: "bg-[color:var(--color-background)]",
+  },
+  rc: {
+    label: "RC",
+    icon: CheckCircle2,
+    iconClass: "text-sky-400",
     cellClass: "bg-[color:var(--color-background)]",
   },
   pending: {
@@ -133,6 +145,13 @@ const LANGUAGES: Array<{
     registryUrl: "https://central.sonatype.com/artifact/dev.flametrench/",
     pkgPrefix: "dev.flametrench:",
   },
+  {
+    key: "go",
+    name: "Go",
+    registry: "pkg.go.dev",
+    registryUrl: "https://pkg.go.dev/github.com/flametrench/",
+    pkgPrefix: "github.com/flametrench/",
+  },
 ];
 
 export function StatusMatrix() {
@@ -147,14 +166,12 @@ export function StatusMatrix() {
             Package × language × registry.
           </h2>
           <p className="mt-4 text-[color:var(--color-fg-muted)]">
-            v0.2 stable. All four core packages, all four languages — same
-            semantics, conformance-tested across the family. Registry channels
-            light up as each is published.
+            The specification is at <span className="font-medium text-[color:var(--color-fg)]">v0.3.0 · stable</span>. Go (v0.3.2), PHP, Node, and Python all ship the v0.3 contract and are live on their registries — identity is at v0.3.1 on Node and PHP (CWE-208 timing-oracle patch). Java&apos;s v0.3.0 is tagged and pending Maven Central publication.
           </p>
         </div>
 
         <div className="mt-12 overflow-x-auto rounded-xl border border-[color:var(--color-border)]">
-          <table className="w-full min-w-[820px] border-collapse text-sm">
+          <table className="w-full min-w-[1020px] border-collapse text-sm">
             <thead>
               <tr className="bg-[color:var(--color-surface)]">
                 <th className="border-b border-[color:var(--color-border)] px-4 py-3 text-left font-mono text-[11px] uppercase tracking-wider text-[color:var(--color-fg-faint)]">
@@ -211,16 +228,24 @@ export function StatusMatrix() {
           </table>
         </div>
 
-        <p className="mt-6 max-w-3xl text-xs text-[color:var(--color-fg-muted)]">
+        <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-[color:var(--color-fg-muted)]">
+          <span className="font-mono text-[color:var(--color-fg-faint)] uppercase tracking-wider text-[11px]">
+            Protocol: v0.3.0
+          </span>
+          <span className="text-[color:var(--color-border-strong)]" aria-hidden>|</span>
           <span className="inline-flex items-center gap-1">
             <CheckCircle2 size={12} className="text-emerald-400" /> Live
           </span>{" "}
           — installable today.
-          <span className="ml-3 inline-flex items-center gap-1">
+          <span className="inline-flex items-center gap-1">
+            <CheckCircle2 size={12} className="text-sky-400" /> RC
+          </span>{" "}
+          — pre-release, installable via rc dist-tag.
+          <span className="inline-flex items-center gap-1">
             <Clock size={12} className="text-amber-400" /> Pending
           </span>{" "}
           — publishing soon.
-        </p>
+        </div>
 
         <div className="mt-8 flex flex-wrap gap-3 text-sm">
           <Link
