@@ -16,8 +16,9 @@ import { Container } from "./container";
 // Verify with `npm view @flametrench/<pkg> versions --json` (note the
 // plural — singular `version` returns only the `latest` dist-tag,
 // missing RCs published under `rc` / `next`). PHP/Packagist auto-syncs
-// from git tags. Python publishes via Trusted Publishing (PyPI) —
-// cells flip pending → live once the publish job runs.
+// from git tags. Python publishes via Trusted Publishing (PyPI).
+// Java publishes to Maven Central — cells flip pending → live once the
+// publish job runs.
 
 type ChannelState = "live" | "rc" | "pending" | "planned";
 
@@ -37,10 +38,10 @@ const ROWS: Row[] = [
     pkg: "ids",
     blurb: "Wire-format identifiers (UUIDv7, prefixed).",
     cells: {
-      node: { version: "v0.2.0", channel: "live" },
-      php: { version: "v0.2.0", channel: "live" },
-      python: { version: "v0.2.0", channel: "pending" },
-      java: { version: "v0.2.0", channel: "pending" },
+      node: { version: "v0.3.0", channel: "live" },
+      php: { version: "v0.3.0", channel: "live" },
+      python: { version: "v0.3.0", channel: "live" },
+      java: { version: "v0.3.0", channel: "pending" },
       go: { version: "v0.3.2", channel: "live" },
     },
   },
@@ -48,10 +49,10 @@ const ROWS: Row[] = [
     pkg: "identity",
     blurb: "Users, credentials, sessions, MFA, display name, listUsers.",
     cells: {
-      node: { version: "v0.2.1", channel: "live" },
-      php: { version: "v0.2.0", channel: "live" },
-      python: { version: "v0.2.0", channel: "pending" },
-      java: { version: "v0.2.0", channel: "pending" },
+      node: { version: "v0.3.1", channel: "live" },
+      php: { version: "v0.3.1", channel: "live" },
+      python: { version: "v0.3.0", channel: "live" },
+      java: { version: "v0.3.0", channel: "pending" },
       go: { version: "v0.3.2", channel: "live" },
     },
   },
@@ -59,10 +60,10 @@ const ROWS: Row[] = [
     pkg: "tenancy",
     blurb: "Organizations, memberships, invitations.",
     cells: {
-      node: { version: "v0.2.1", channel: "live" },
-      php: { version: "v0.2.0", channel: "live" },
-      python: { version: "v0.2.0", channel: "pending" },
-      java: { version: "v0.2.0", channel: "pending" },
+      node: { version: "v0.3.0", channel: "live" },
+      php: { version: "v0.3.0", channel: "live" },
+      python: { version: "v0.3.0", channel: "live" },
+      java: { version: "v0.3.0", channel: "pending" },
       go: { version: "v0.3.2", channel: "live" },
     },
   },
@@ -70,10 +71,10 @@ const ROWS: Row[] = [
     pkg: "authz",
     blurb: "Tuples, check(), rewrite rules, share tokens.",
     cells: {
-      node: { version: "v0.2.1", channel: "live" },
-      php: { version: "v0.2.0", channel: "live" },
-      python: { version: "v0.2.0", channel: "pending" },
-      java: { version: "v0.2.0", channel: "pending" },
+      node: { version: "v0.3.0", channel: "live" },
+      php: { version: "v0.3.0", channel: "live" },
+      python: { version: "v0.3.0", channel: "live" },
+      java: { version: "v0.3.0", channel: "pending" },
       go: { version: "v0.3.2", channel: "live" },
     },
   },
@@ -165,7 +166,7 @@ export function StatusMatrix() {
             Package × language × registry.
           </h2>
           <p className="mt-4 text-[color:var(--color-fg-muted)]">
-            The specification is at <span className="font-medium text-[color:var(--color-fg)]">v0.3.0 · stable</span>. SDK families implement the spec at their own release cadence — Go ships the v0.3 contract at v0.3.2 via the Go module proxy; Node and PHP are at v0.2.x with v0.3 releases forthcoming; Python and Java are pending registry publication.
+            The specification is at <span className="font-medium text-[color:var(--color-fg)]">v0.3.0 · stable</span>. Go (v0.3.2), PHP, Node, and Python all ship the v0.3 contract and are live on their registries — identity is at v0.3.1 on Node and PHP (CWE-208 timing-oracle patch). Java&apos;s v0.3.0 is tagged and pending Maven Central publication.
           </p>
         </div>
 
