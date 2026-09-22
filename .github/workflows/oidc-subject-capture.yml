@@ -82,10 +82,16 @@ jobs:
 
                   # Only the base64url *payload* segment — the claims,
                   # with no signature — ever reaches a variable, to
-                  # compute padding. Detached from its signature this
-                  # can't authenticate as the token, so binding it here
-                  # doesn't reintroduce the hazard above; it's the same
-                  # information we're about to print regardless.
+                  # compute padding. Safe for two independent reasons,
+                  # both of which have to hold wherever this job gets
+                  # copied, not just here: (1) detached from its
+                  # signature it cannot authenticate to AWS, which needs
+                  # the complete signed token; (2) every claim in a
+                  # GitHub OIDC payload — sub/aud and the ~28 others,
+                  # repo, ref, sha, actor, workflow, etc. — describes
+                  # workflow context already visible to anyone who can
+                  # read this log, public or private. It is NOT limited
+                  # to the two claims this job prints.
                   payload_b64=$(echo -n "$payload_b64url" | tr '_-' '/+')
                   case $(( ${#payload_b64} % 4 )) in
                       2) payload_b64="${payload_b64}==" ;;
