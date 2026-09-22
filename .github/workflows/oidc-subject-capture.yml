@@ -1,0 +1,71 @@
+# Throwaway diagnostic — NOT a deploy workflow.
+#
+# Purpose: capture the exact OIDC token `sub` claim GitHub emits for a job
+# on this repo that declares `environment: production`. No run has ever
+# produced this subject — deploy.yml's own production path is gated behind
+# this same environment and has never completed one (the one prior attempt,
+# on a since-deleted branch, was rejected by the environment's branch
+# policy before it produced a token). Cloud's IAM trust policy does a
+# `StringEquals` match against the literal subject with no wildcard, so
+# this proves the exact string before anything real depends on it.
+#
+# Deliberately does nothing else:
+#   - No `aws-actions/configure-aws-credentials`, no AWS calls of any kind.
+#   - No inputs, so there is nothing caller-supplied to interpolate into a
+#     `run:` block — not a rule to remember, just nothing to interpolate.
+#   - Never prints the token itself, only the decoded `sub` claim, and
+#     masks the token value regardless as defense in depth.
+#
+# This is not `deploy.yml` with `stage=production` — it is a separate,
+# minimal probe. Delete this file once the subject has been confirmed; it
+# has no ongoing purpose.
+
+name: OIDC subject capture (throwaway diagnostic)
+
+on:
+    workflow_dispatch:
+
+permissions:
+    id-token: write
+    contents: read
+
+jobs:
+    capture-subject:
+        runs-on: ubuntu-latest
+        environment: production
+        steps:
+            - name: Request OIDC token and print decoded subject only
+              run: |
+                  set -euo pipefail
+
+                  if [ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ] || [ -z "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]; then
+                      echo "::error::OIDC token request vars not present — check permissions.id-token: write." >&2
+                      exit 1
+                  fi
+
+                  # Same audience aws-actions/configure-aws-credentials
+                  # requests by default, so this reflects the subject the
+                  # real deploy job would present to AWS.
+                  response=$(curl -fsS \
+                      -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+                      "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com")
+                  echo "::add-mask::$response"
+
+                  jwt=$(echo "$response" | jq -r '.value')
+                  echo "::add-mask::$jwt"
+
+                  payload_b64url=$(echo "$jwt" | cut -d '.' -f2)
+                  # base64url -> base64: swap alphabet, then pad to a
+                  # multiple of 4.
+                  payload_b64=$(echo -n "$payload_b64url" | tr '_-' '/+')
+                  case $(( ${#payload_b64} % 4 )) in
+                      2) payload_b64="${payload_b64}==" ;;
+                      3) payload_b64="${payload_b64}=" ;;
+                  esac
+
+                  sub=$(echo "$payload_b64" | base64 -d 2>/dev/null | jq -r '.sub')
+
+                  unset response jwt payload_b64url payload_b64
+
+                  echo "OIDC subject for environment: production on this repo:"
+                  echo "sub=$sub"
