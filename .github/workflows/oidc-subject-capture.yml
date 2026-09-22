@@ -14,8 +14,18 @@
 #   - No `aws-actions/configure-aws-credentials`, no AWS calls of any kind.
 #   - No inputs, so there is nothing caller-supplied to interpolate into a
 #     `run:` block — not a rule to remember, just nothing to interpolate.
-#   - Never prints the token itself, only the decoded `sub`/`aud` claims,
-#     and masks the token value regardless as defense in depth.
+#   - The minted ID token is never bound to a shell variable — it's piped
+#     straight from curl through jq/cut, so there's nothing token-shaped
+#     for a future `set -x` to expand. This matters because the repo is
+#     public and this run is retained permanently: masking is the backup
+#     control here, not the only one. The one thing that does reach a
+#     variable is the base64url *payload* segment alone (claims, no
+#     signature) purely to compute padding — detached from its signature
+#     it can't authenticate as the token, so it doesn't reopen the same
+#     hazard. The runner-supplied request token is masked as defense in
+#     depth since it's an existing env var (not something this script
+#     mints) that still appears inline in the curl command.
+#   - Only ever prints the decoded `sub`/`aud` claims, nothing else.
 #
 # This is not `deploy.yml` with `stage=production` — it is a separate,
 # minimal probe. Delete this file once the subject has been confirmed; it
@@ -44,20 +54,38 @@ jobs:
                       exit 1
                   fi
 
-                  # Same audience aws-actions/configure-aws-credentials
-                  # requests by default, so this reflects the subject the
-                  # real deploy job would present to AWS.
-                  response=$(curl -fsS \
-                      -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
-                      "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com")
-                  echo "::add-mask::$response"
+                  # Runner-supplied request token — mask as defense in
+                  # depth even though it's an existing env var, not
+                  # something this script mints. It appears inline in the
+                  # curl command below either way.
+                  echo "::add-mask::${ACTIONS_ID_TOKEN_REQUEST_TOKEN}"
 
-                  jwt=$(echo "$response" | jq -r '.value')
-                  echo "::add-mask::$jwt"
+                  # The minted ID token itself is NEVER bound to a shell
+                  # variable. This repo is public and this run is
+                  # retained permanently, so if anyone later adds `set -x`
+                  # while debugging this job, there must be nothing
+                  # token-shaped for it to expand — piping avoids that
+                  # regardless of masking. Same audience
+                  # aws-actions/configure-aws-credentials requests by
+                  # default, so this reflects the subject the real deploy
+                  # job would present to AWS.
+                  payload_b64url=$(curl -fsS \
+                          -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+                          "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com" \
+                      | jq -r '.value // empty' \
+                      | cut -d '.' -f2)
 
-                  payload_b64url=$(echo "$jwt" | cut -d '.' -f2)
-                  # base64url -> base64: swap alphabet, then pad to a
-                  # multiple of 4.
+                  if [ -z "$payload_b64url" ]; then
+                      echo "::error::Token response had no .value — check the step's exit status above." >&2
+                      exit 1
+                  fi
+
+                  # Only the base64url *payload* segment — the claims,
+                  # with no signature — ever reaches a variable, to
+                  # compute padding. Detached from its signature this
+                  # can't authenticate as the token, so binding it here
+                  # doesn't reintroduce the hazard above; it's the same
+                  # information we're about to print regardless.
                   payload_b64=$(echo -n "$payload_b64url" | tr '_-' '/+')
                   case $(( ${#payload_b64} % 4 )) in
                       2) payload_b64="${payload_b64}==" ;;
@@ -65,10 +93,13 @@ jobs:
                   esac
 
                   decoded=$(echo "$payload_b64" | base64 -d 2>/dev/null)
-                  sub=$(echo "$decoded" | jq -r '.sub')
-                  aud=$(echo "$decoded" | jq -r '.aud')
+                  sub=$(echo "$decoded" | jq -r '.sub // empty')
+                  aud=$(echo "$decoded" | jq -r '.aud // empty')
 
-                  unset response jwt payload_b64url payload_b64 decoded
+                  if [ -z "$sub" ] || [ -z "$aud" ]; then
+                      echo "::error::Decoded token payload missing sub or aud." >&2
+                      exit 1
+                  fi
 
                   echo "OIDC claims for environment: production on this repo:"
                   echo "sub=$sub"
