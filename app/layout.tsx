@@ -42,7 +42,15 @@ export const metadata: Metadata = {
     title: "Flametrench",
     description:
       "An open specification and SDK family for identity, tenancy, and authorization.",
-    images: ["/og.png"],
+    images: [
+      {
+        url: "/og.png",
+        width: 1200,
+        height: 630,
+        type: "image/png",
+        alt: "Flametrench — Backbone infrastructure for applications",
+      },
+    ],
   },
 };
 
