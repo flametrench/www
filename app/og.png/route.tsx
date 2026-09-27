@@ -44,22 +44,6 @@ export async function GET() {
           >
             flametrench
           </div>
-          <div
-            style={{
-              display: "flex",
-              fontSize: 14,
-              fontWeight: 500,
-              textTransform: "uppercase",
-              letterSpacing: "0.08em",
-              color: "#a3a3a3",
-              border: "1px solid rgba(255,255,255,0.12)",
-              borderRadius: 6,
-              padding: "4px 10px",
-              marginLeft: 8,
-            }}
-          >
-            v0.2 · stable
-          </div>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
