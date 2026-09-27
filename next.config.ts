@@ -22,8 +22,8 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: __dirname,
 
   // Static export — every route is content-driven MDX with no per-
-  // request data, no server actions, no route handlers, no
-  // middleware. Building to `out/` lets the site deploy as plain
+  // request data, no server actions, no dynamic route handlers (the
+  // only one, app/og.png, is force-static), no middleware. Building to `out/` lets the site deploy as plain
   // S3 + CloudFront under SiteSource Cloud's `react-spa` stack.
   // See https://github.com/sitesource/cloud/blob/main/docs/guides/nextjs-static-export.md
   // for the full migration recipe.
