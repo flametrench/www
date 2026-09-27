@@ -98,7 +98,7 @@ export async function GET() {
           <div style={{ display: "flex" }}>·</div>
           <div style={{ display: "flex" }}>Postgres native</div>
           <div style={{ display: "flex" }}>·</div>
-          <div style={{ display: "flex" }}>Node · PHP · Python · Java</div>
+          <div style={{ display: "flex" }}>Node · PHP · Python · Java · Go</div>
           <div style={{ display: "flex" }}>·</div>
           <div style={{ display: "flex" }}>Apache 2.0</div>
         </div>
