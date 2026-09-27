@@ -19,20 +19,38 @@ export const metadata: Metadata = {
   },
   description:
     "An open specification and SDK family for identity, tenancy, and authorization. Byte-identical semantics across PHP and Node. Apache 2.0.",
-  metadataBase: new URL("https://flametrench.dev"),
+  metadataBase: new URL("https://www.flametrench.dev"),
   openGraph: {
     title: "Flametrench",
     description:
       "An open specification and SDK family for identity, tenancy, and authorization.",
-    url: "https://flametrench.dev",
+    url: "https://www.flametrench.dev",
     siteName: "Flametrench",
     type: "website",
+    images: [
+      {
+        url: "/og.png",
+        width: 1200,
+        height: 630,
+        type: "image/png",
+        alt: "Flametrench — Backbone infrastructure for applications",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "Flametrench",
     description:
       "An open specification and SDK family for identity, tenancy, and authorization.",
+    images: [
+      {
+        url: "/og.png",
+        width: 1200,
+        height: 630,
+        type: "image/png",
+        alt: "Flametrench — Backbone infrastructure for applications",
+      },
+    ],
   },
 };
 

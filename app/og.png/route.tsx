@@ -1,16 +1,15 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "Flametrench — Backbone infrastructure for applications";
-export const size = { width: 1200, height: 630 };
-export const contentType = "image/png";
+const size = { width: 1200, height: 630 };
 
-// `output: 'export'` requires every route to declare its rendering
-// posture explicitly. This OG image renders identically on every
-// build; `force-static` tells Next to generate the PNG once at
-// build time and emit it into `out/opengraph-image.png`.
+// A route handler under a `.png` segment rather than the
+// `opengraph-image` file convention: under `output: 'export'` the
+// convention emits an extensionless `out/opengraph-image`, which static
+// hosts serve as application/octet-stream. This emits `out/og.png`.
+// Referenced from `metadata.openGraph.images` in app/layout.tsx.
 export const dynamic = "force-static";
 
-export default async function OpengraphImage() {
+export async function GET() {
   return new ImageResponse(
     (
       <div
