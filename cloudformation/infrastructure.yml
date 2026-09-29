@@ -1,0 +1,315 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: |
+    sitesource/cloud — react-spa infrastructure for a single project + environment.
+    Provisions: private S3 bucket + CloudFront distribution with OAC. Routing is SPA (404→index.html)
+    or, for a multi-page static export (RoutingMode=static), directory indexes + a real 404.
+    Legacy environments apply it once by hand. Environments created by app import (cloud ADR 0028
+    D5) pass NamePrefix, and the deploy workflow creates/updates the stack itself under a per-app
+    CloudFormation service role.
+
+Parameters:
+    ProjectSlug:
+        Type: String
+        Description: cloud_project.slug from admin.
+        # A digit may lead: app-import slugs are kebab(repo) (cloud ADR 0028 D2).
+        AllowedPattern: '^[a-z0-9][a-z0-9-]*$'
+
+    EnvironmentName:
+        Type: String
+        Description: cloud_environment.name (production / staging / preview).
+        AllowedPattern: '^[a-z][a-z0-9-]*$'
+
+    NamePrefix:
+        Type: String
+        Default: ''
+        Description: >-
+            cloud ADR 0028 D5. The imported environment's org-qualified name prefix,
+            cloud-<org key>-<slug>-<env> (the bucket is <prefix>-assets, so at most 56
+            characters). Leave blank for a legacy environment: names stay
+            cloud-<ProjectSlug>-<EnvironmentName>, exactly as before.
+        AllowedPattern: '^(cloud-[0-9a-f]{8}-[a-z0-9]+(-[a-z0-9]+)*)?$'
+        MaxLength: 56
+
+    PriceClass:
+        Type: String
+        Default: PriceClass_100
+        AllowedValues:
+            - PriceClass_100   # US, Canada, Europe (cheapest)
+            - PriceClass_200   # + Asia, Mexico
+            - PriceClass_All   # all edge locations
+
+    AcmCertificateArn:
+        Type: String
+        Default: ''
+        Description: >-
+            Optional. ARN of an ACM certificate in us-east-1 (required region for
+            CloudFront), already ISSUED, covering every name in DomainAliases.
+            ACM issuance/validation is still manual — see docs/guides/production-cutover.md
+            and stubs/react-spa/README.stub.md. Leave blank to serve the default
+            *.cloudfront.net domain only (existing behavior, unchanged).
+
+    DomainAliases:
+        Type: CommaDelimitedList
+        Default: ''
+        Description: >-
+            Optional. Comma-delimited custom domain names (e.g. example.com,www.example.com)
+            to serve from this distribution. Ignored unless AcmCertificateArn is set —
+            CloudFront rejects Aliases without a matching non-default certificate.
+
+    RoutingMode:
+        Type: String
+        Default: spa
+        AllowedValues: [spa, static]
+        Description: >-
+            spa — client-side routing: any missing path serves /index.html with 200 (the
+            default; today's behavior). static — a multi-page static export (Next.js
+            output:'export' with trailingSlash, Astro, Hugo…): /x/ serves x/index.html, /x
+            308-redirects to /x/, and a missing path serves /404.html with status 404. The
+            deploy workflow derives it from the build output (a top-level 404.html); nobody
+            is asked.
+
+    CanonicalHost:
+        Type: String
+        Default: ''
+        Description: >-
+            Optional. The one hostname this site answers on (e.g. www.example.com). Any
+            other Host (the apex, or the *.cloudfront.net name) gets a 307 to
+            https://<CanonicalHost><same path and query>. Blank = no redirect.
+        AllowedPattern: '^([a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+)?$'
+        MaxLength: 253
+
+Conditions:
+    HasCustomDomain: !Not [!Equals [!Ref AcmCertificateArn, '']]
+    HasNamePrefix: !Not [!Equals [!Ref NamePrefix, '']]
+    IsStaticRouting: !Equals [!Ref RoutingMode, static]
+    HasCanonicalHost: !Not [!Equals [!Ref CanonicalHost, '']]
+    NeedsViewerFunction: !Or [!Condition IsStaticRouting, !Condition HasCanonicalHost]
+
+Resources:
+    AssetsBucket:
+        Type: AWS::S3::Bucket
+        DeletionPolicy: Retain
+        UpdateReplacePolicy: Retain
+        Properties:
+            BucketName: !If
+                - HasNamePrefix
+                - !Sub '${NamePrefix}-assets'
+                - !Sub 'cloud-${ProjectSlug}-${EnvironmentName}-assets'
+            PublicAccessBlockConfiguration:
+                BlockPublicAcls: true
+                BlockPublicPolicy: true
+                IgnorePublicAcls: true
+                RestrictPublicBuckets: true
+            BucketEncryption:
+                ServerSideEncryptionConfiguration:
+                    - ServerSideEncryptionByDefault:
+                          SSEAlgorithm: AES256
+
+    OriginAccessControl:
+        Type: AWS::CloudFront::OriginAccessControl
+        Properties:
+            OriginAccessControlConfig:
+                Name: !If
+                    - HasNamePrefix
+                    - !Sub '${NamePrefix}-oac'
+                    - !Sub 'cloud-${ProjectSlug}-${EnvironmentName}-oac'
+                OriginAccessControlOriginType: s3
+                SigningBehavior: always
+                SigningProtocol: sigv4
+
+    # Matches what the site had on Vercel: HSTS for two years (the managed
+    # SecurityHeadersPolicy sends one year), plus the managed policy's other
+    # headers unchanged.
+    ResponseHeaders:
+        Type: AWS::CloudFront::ResponseHeadersPolicy
+        Properties:
+            ResponseHeadersPolicyConfig:
+                Name: !If
+                    - HasNamePrefix
+                    - !Sub '${NamePrefix}-headers'
+                    - !Sub 'cloud-${ProjectSlug}-${EnvironmentName}-headers'
+                Comment: !Sub 'cloud/${ProjectSlug}/${EnvironmentName} security headers'
+                SecurityHeadersConfig:
+                    StrictTransportSecurity:
+                        AccessControlMaxAgeSec: 63072000
+                        IncludeSubdomains: false
+                        Preload: false
+                        Override: true
+                    ContentTypeOptions:
+                        Override: true
+                    FrameOptions:
+                        FrameOption: SAMEORIGIN
+                        Override: false
+                    ReferrerPolicy:
+                        ReferrerPolicy: strict-origin-when-cross-origin
+                        Override: false
+                    XSSProtection:
+                        Protection: true
+                        ModeBlock: true
+                        Override: false
+
+    # Viewer-request routing. Only created when needed (static routing or a
+    # canonical host), so an SPA stack with no domain is unchanged. Plain ES5
+    # on purpose: cloudfront-js-2.0, and no `${` inside (this is a !Sub).
+    ViewerFunction:
+        Type: AWS::CloudFront::Function
+        Condition: NeedsViewerFunction
+        Properties:
+            Name: !If
+                - HasNamePrefix
+                - !Sub '${NamePrefix}-viewer'
+                - !Sub 'cloud-${ProjectSlug}-${EnvironmentName}-viewer'
+            AutoPublish: true
+            FunctionConfig:
+                Comment: !Sub 'cloud/${ProjectSlug}/${EnvironmentName} routing (${RoutingMode})'
+                Runtime: cloudfront-js-2.0
+            FunctionCode: !Sub
+                - |
+                    // BEGIN viewer-function
+                    var STATIC_ROUTING = '${Mode}' === 'static';
+                    var CANONICAL_HOST = '${Canonical}';
+                    // Next.js metadata images are exported WITHOUT an extension; they are files, not directories.
+                    var EXTENSIONLESS_FILES = /^(opengraph-image|twitter-image|icon|apple-icon)(-[A-Za-z0-9_]+)?$/;
+
+                    function query(qs) {
+                        var parts = [];
+                        for (var k in qs) {
+                            var v = qs[k];
+                            var vals = v.multiValue ? v.multiValue : [v];
+                            for (var i = 0; i < vals.length; i++) {
+                                parts.push(vals[i].value === '' ? k : k + '=' + vals[i].value);
+                            }
+                        }
+                        return parts.length ? '?' + parts.join('&') : '';
+                    }
+
+                    function redirect(code, location) {
+                        return {
+                            statusCode: code,
+                            statusDescription: code === 308 ? 'Permanent Redirect' : 'Temporary Redirect',
+                            headers: { location: { value: location }, 'cache-control': { value: 'public, max-age=300' } }
+                        };
+                    }
+
+                    function handler(event) {
+                        var req = event.request;
+                        var host = req.headers.host ? req.headers.host.value.toLowerCase() : '';
+                        if (CANONICAL_HOST !== '' && host !== CANONICAL_HOST) {
+                            return redirect(307, 'https://' + CANONICAL_HOST + req.uri + query(req.querystring));
+                        }
+                        if (!STATIC_ROUTING) {
+                            return req;
+                        }
+                        var uri = req.uri;
+                        if (uri.charAt(uri.length - 1) === '/') {
+                            req.uri = uri + 'index.html';
+                            return req;
+                        }
+                        var last = uri.substring(uri.lastIndexOf('/') + 1);
+                        if (last.indexOf('.') === -1 && !EXTENSIONLESS_FILES.test(last)) {
+                            // Absolute, on this request's own host, leading slashes (and
+                            // backslashes) collapsed: '//evil.com/x' must never become a
+                            // protocol-relative Location (cloud-security, #106).
+                            return redirect(308, 'https://' + host + '/' + uri.replace(/^[\/\\]+/, '') + '/' + query(req.querystring));
+                        }
+                        return req;
+                    }
+                    // END viewer-function
+                - Mode: !Ref RoutingMode
+                  Canonical: !Ref CanonicalHost
+
+    CloudFrontDistribution:
+        Type: AWS::CloudFront::Distribution
+        Properties:
+            DistributionConfig:
+                Enabled: true
+                Comment: !Sub 'cloud/${ProjectSlug}/${EnvironmentName}'
+                DefaultRootObject: index.html
+                PriceClass: !Ref PriceClass
+                HttpVersion: http2and3
+                IPV6Enabled: true
+
+                # Both omitted (AWS::NoValue) unless AcmCertificateArn is set, which
+                # preserves today's default-*.cloudfront.net-domain behavior exactly
+                # for stacks that don't pass the new parameters (e.g. existing staging
+                # stacks applied before this change).
+                Aliases: !If [HasCustomDomain, !Ref DomainAliases, !Ref 'AWS::NoValue']
+                ViewerCertificate: !If
+                    - HasCustomDomain
+                    - AcmCertificateArn: !Ref AcmCertificateArn
+                      SslSupportMethod: sni-only
+                      MinimumProtocolVersion: TLSv1.2_2021
+                    - !Ref 'AWS::NoValue'
+
+                Origins:
+                    - Id: assets-bucket
+                      DomainName: !GetAtt AssetsBucket.RegionalDomainName
+                      OriginAccessControlId: !GetAtt OriginAccessControl.Id
+                      S3OriginConfig:
+                          OriginAccessIdentity: ''
+
+                DefaultCacheBehavior:
+                    TargetOriginId: assets-bucket
+                    ViewerProtocolPolicy: redirect-to-https
+                    AllowedMethods: [GET, HEAD, OPTIONS]
+                    CachedMethods: [GET, HEAD]
+                    Compress: true
+                    CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6  # CachingOptimized (managed)
+                    ResponseHeadersPolicyId: !Ref ResponseHeaders
+                    FunctionAssociations: !If
+                        - NeedsViewerFunction
+                        - - EventType: viewer-request
+                            FunctionARN: !GetAtt ViewerFunction.FunctionARN
+                        - !Ref 'AWS::NoValue'
+
+                # A missing object reaches CloudFront as 403 (OAC, no s3:ListBucket)
+                # or 404. SPA: serve /index.html with 200 so client-side routes work.
+                # Static export: serve the site's own /404.html with a real 404.
+                CustomErrorResponses: !If
+                    - IsStaticRouting
+                    - - ErrorCode: 403
+                        ResponseCode: 404
+                        ResponsePagePath: /404.html
+                        ErrorCachingMinTTL: 10
+                      - ErrorCode: 404
+                        ResponseCode: 404
+                        ResponsePagePath: /404.html
+                        ErrorCachingMinTTL: 10
+                    - - ErrorCode: 403
+                        ResponseCode: 200
+                        ResponsePagePath: /index.html
+                        ErrorCachingMinTTL: 10
+                      - ErrorCode: 404
+                        ResponseCode: 200
+                        ResponsePagePath: /index.html
+                        ErrorCachingMinTTL: 10
+
+    AssetsBucketPolicy:
+        Type: AWS::S3::BucketPolicy
+        Properties:
+            Bucket: !Ref AssetsBucket
+            PolicyDocument:
+                Version: '2012-10-17'
+                Statement:
+                    - Sid: AllowCloudFrontServicePrincipalRead
+                      Effect: Allow
+                      Principal:
+                          Service: cloudfront.amazonaws.com
+                      Action: s3:GetObject
+                      Resource: !Sub '${AssetsBucket.Arn}/*'
+                      Condition:
+                          StringEquals:
+                              AWS:SourceArn: !Sub 'arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistribution}'
+
+Outputs:
+    AssetsBucketName:
+        Description: S3 bucket holding built SPA assets. The deploy workflow syncs build/ here.
+        Value: !Ref AssetsBucket
+
+    DistributionId:
+        Description: CloudFront distribution id. The deploy workflow creates an invalidation against this id.
+        Value: !Ref CloudFrontDistribution
+
+    DistributionDomain:
+        Description: Default CloudFront domain. Configure your custom domain (cloud_environment.domain) to alias here.
+        Value: !GetAtt CloudFrontDistribution.DomainName
