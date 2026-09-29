@@ -17,12 +17,22 @@
 #
 # Optional repository variables (Phase 3+):
 #   ADMIN_WEBHOOK_URL    Admin's webhook base URL.
-# Optional repository secrets (Phase 3+):
-#   ADMIN_WEBHOOK_SECRET HMAC shared secret for webhook signing.
+# The completion callback is signed with the per-run webhook_secret input
+# Cloud sends (cloud ADR 0028 D8): no repository secret to set.
 #
-# Pre-requisite: the cloudformation/infrastructure.yml stack has been
-# deployed for this stage. The stack outputs AssetsBucketName and
-# DistributionId; this workflow looks them up via the AWS CLI.
+# Infrastructure (cloudformation/infrastructure.yml):
+#   - Environments created by app import (cloud ADR 0028 D5) carry an
+#     org-qualified name prefix in the dispatch payload (aws_name_prefix).
+#     This workflow then creates/updates the stack itself, named <prefix>,
+#     under the per-app CloudFormation service role in the GitHub
+#     Environment variable CLOUD_CFN_SERVICE_ROLE_ARN (created by Cloud's
+#     per-app OpenTofu module). The deploy role can only pass that role and
+#     act on its own stack; the template can create only what the service
+#     role allows (the template is in your repo and is not trusted).
+#   - Legacy environments (no prefix): the stack cloud-<slug>-<stage> has
+#     been applied by hand, as before.
+# Either way the stack outputs AssetsBucketName and DistributionId, which
+# this workflow looks up via the AWS CLI.
 #
 # Security note: untrusted GH context values (vars.*, secrets.*,
 # inputs.*) are NEVER interpolated into shell scripts directly — they
@@ -43,23 +53,94 @@ on:
                     - staging
                     - production
                     - preview
-            run_id:
-                description: 'cloud_run id from admin (Phase 3+; leave blank for manual)'
+            # ADR 0024 — cap-relief. Non-secret scalars (run_id,
+            # change_kind, etc.) bundled into one JSON payload.
+            # admin dispatches the same 6-input shape to all stubs.
+            payload:
+                description: 'JSON object of non-secret scalar inputs — run_id, change_kind, etc. (ADR 0024)'
                 required: false
                 type: string
+                default: '{}'
+            app_env_vars:
+                description: 'JSON object of non-secret env vars (ADR 0020)'
+                required: false
+                type: string
+                default: ''
+            app_secrets:
+                description: 'JSON object of secret env vars (ADR 0020)'
+                required: false
+                type: string
+                default: ''
+            aws_secret_handles:
+                description: 'JSON map of {ENV_VAR_NAME: secret_arn} (ADR 0020)'
+                required: false
+                type: string
+                default: ''
+            cfn_body:
+                description: 'Reserved for CFN-passthrough actions (ADR 0024)'
+                required: false
+                type: string
+                default: ''
+            # cloud ADR 0028 D8 — the per-org HMAC secret this run signs its
+            # completion callback with. Cloud sends it on every dispatch, so
+            # no GitHub secret has to be set on the repo. inputs.* are NOT
+            # auto-masked: the job's first step reads it from the event
+            # payload and masks it (the same step as laravel-bref's).
+            webhook_secret:
+                description: 'Per-org HMAC secret for the completion callback to admin (ADR 0028 D8); masked in logs'
+                required: false
+                type: string
+                default: ''
 
 permissions:
     id-token: write
     contents: read
 
 env:
-    CLOUD_PROJECT_SLUG: flametrench-www
+    CLOUD_PROJECT_SLUG: ${{ vars.CLOUD_PROJECT_SLUG }}
     CLOUD_REGION: ${{ vars.CLOUD_REGION || 'us-east-1' }}
 
 jobs:
     deploy:
         runs-on: ubuntu-latest
+        # Puts `environment:<stage>` into the OIDC sub claim GitHub mints for
+        # this job (e.g. repo:OWNER/REPO:environment:production) — this is
+        # what makes an environment-scoped trust condition
+        # (iam-trust-policy.template.json's GH_REF_PATTERN =
+        # 'environment:production') actually load-bearing rather than
+        # decorative. Without this key, GitHub never puts environment:* in
+        # the claim regardless of what protection rules the environment has,
+        # and an environment-scoped role could never assume at all
+        # (fail-closed, but confusing to debug at first-deploy time).
+        # Create a GitHub Environment matching each stage you use (at minimum
+        # 'production', per the README's trust-policy guidance) before
+        # dispatching that stage — an undeclared environment is auto-created
+        # on first use with zero protection rules, silently defeating the
+        # point.
+        environment: ${{ inputs.stage }}
         steps:
+            # ADR 0022 — the per-org webhook secret arrives as an input,
+            # and inputs.* are NOT auto-masked. Read it from the event
+            # payload (never via env: or ${{ }} in a script, both of which
+            # print it in a step's log header), mask it, and hand it to
+            # later steps via $GITHUB_ENV, where it then shows as ***.
+            # Must stay the job's first step.
+            - name: Mask secret dispatch inputs
+              run: |
+                  set -euo pipefail
+                  s=$(jq -r '.inputs.webhook_secret // ""' "$GITHUB_EVENT_PATH")
+                  if [ -n "$s" ]; then
+                      # add-mask covers one line; mask each line of the value.
+                      printf '%s\n' "$s" | tr '\r' '\n' | while IFS= read -r line; do
+                          if [ -n "$line" ]; then echo "::add-mask::$line"; fi
+                      done
+                      if [[ "$s" == *$'\n'* || "$s" == *$'\r'* ]]; then
+                          echo "::warning::webhook_secret contains a line break — not exported; webhook callback will be skipped."
+                      else
+                          echo "WEBHOOK_SECRET=$s" >> "$GITHUB_ENV"
+                      fi
+                  fi
+
             - name: Checkout
               uses: actions/checkout@v4
 
@@ -71,61 +152,97 @@ jobs:
             - name: Capture deploy start time
               run: echo "DEPLOY_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
 
-            - name: Configure AWS credentials via OIDC
-              uses: aws-actions/configure-aws-credentials@v4
-              with:
-                  role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
-                  aws-region: ${{ env.CLOUD_REGION }}
-
-            - name: Set up pnpm
-              uses: pnpm/action-setup@v4
-              with:
-                  version: 9
+            - name: Detect package manager
+              id: pm
+              run: |
+                  set -euo pipefail
+                  # BEGIN package-manager
+                  # Which package manager, from the lockfile the repo already has (never
+                  # asked, never a change to the repo): pnpm-lock.yaml → pnpm, yarn.lock
+                  # → yarn (Berry if .yarnrc.yml), package-lock.json → npm. pnpm and yarn
+                  # come from corepack (bundled with Node), at the version the repo's
+                  # package.json "packageManager" names.
+                  locks=0
+                  for f in pnpm-lock.yaml yarn.lock package-lock.json; do [ -f "$f" ] && locks=$((locks + 1)); done
+                  if [ "$locks" -gt 1 ]; then
+                      echo "::warning::More than one lockfile; using pnpm-lock.yaml, then yarn.lock, then package-lock.json."
+                  fi
+                  if [ -f pnpm-lock.yaml ]; then
+                      pm=pnpm
+                  elif [ -f yarn.lock ]; then
+                      pm=yarn
+                  else
+                      pm=npm
+                  fi
+                  # END package-manager
+                  cache=''
+                  if [ "$pm" = npm ] && [ -f package-lock.json ]; then cache=npm; fi
+                  echo "pm=$pm" >> "$GITHUB_OUTPUT"
+                  echo "cache=$cache" >> "$GITHUB_OUTPUT"
+                  echo "Package manager: $pm"
 
             - name: Set up Node.js
               uses: actions/setup-node@v4
               with:
                   node-version: '20'
-                  cache: 'pnpm'
+                  cache: ${{ steps.pm.outputs.cache }}
 
-            - name: Install dependencies
-              run: pnpm install --frozen-lockfile
-
-            - name: Build SPA
-              run: pnpm run build
+            # www-specific (kept from this repo's previous workflow): package.json
+            # has no "packageManager", and pnpm-lock.yaml is lockfile v9, so pin
+            # pnpm 9 for corepack rather than take its default. Remove this step
+            # if package.json gains "packageManager": "pnpm@9.x".
+            - name: Pin pnpm 9 (www)
               env:
-                  NODE_ENV: production
-                  NEXT_PUBLIC_STAGE: ${{ inputs.stage }}
-
-            - name: Resolve infrastructure outputs
-              id: infra
-              env:
-                  STAGE: ${{ inputs.stage }}
+                  COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
               run: |
                   set -euo pipefail
-                  STACK="cloud-${CLOUD_PROJECT_SLUG}-${STAGE}"
-                  bucket=$(aws cloudformation describe-stacks --stack-name "$STACK" --query "Stacks[0].Outputs[?OutputKey=='AssetsBucketName'].OutputValue" --output text)
-                  dist=$(aws cloudformation describe-stacks --stack-name "$STACK" --query "Stacks[0].Outputs[?OutputKey=='DistributionId'].OutputValue" --output text)
-                  if [ -z "$bucket" ] || [ -z "$dist" ]; then
-                      echo "Stack $STACK not found or outputs missing. Apply cloudformation/infrastructure.yml first." >&2
-                      exit 1
-                  fi
-                  echo "bucket=$bucket" >> "$GITHUB_OUTPUT"
-                  echo "dist=$dist" >> "$GITHUB_OUTPUT"
-                  echo "Bucket: $bucket"
-                  echo "Distribution: $dist"
+                  corepack enable
+                  corepack prepare pnpm@9 --activate
+                  pnpm --version
 
-            - name: Sync build output to S3
-              # `--delete` removes objects no longer in the build, keeping the
-              # bucket in lock-step with the deployed bundle.
-              #
-              # Auto-detects the build output directory: Next.js static
-              # export writes to `out/`, Vite/CRA/Astro write to `dist/`,
-              # older CRA writes to `build/`. If your tool uses a different
-              # directory, set BUILD_DIR explicitly via `vars.BUILD_DIR` or
-              # hardcode here.
+            - name: Install dependencies
               env:
-                  BUCKET: ${{ steps.infra.outputs.bucket }}
+                  pm: ${{ steps.pm.outputs.pm }}
+                  COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+              run: |
+                  set -euo pipefail
+                  # BEGIN install
+                  case "$pm" in
+                      pnpm)
+                          corepack enable
+                          pnpm install --frozen-lockfile
+                          ;;
+                      yarn)
+                          corepack enable
+                          if [ -f .yarnrc.yml ]; then yarn install --immutable; else yarn install --frozen-lockfile; fi
+                          ;;
+                      *)
+                          if [ -f package-lock.json ]; then
+                              npm ci
+                          else
+                              echo "::warning::No lockfile; installing with npm install (not reproducible). Commit a lockfile to pin versions."
+                              npm install
+                          fi
+                          ;;
+                  esac
+                  # END install
+
+            - name: Build SPA
+              run: '"$pm" run build'
+              env:
+                  pm: ${{ steps.pm.outputs.pm }}
+                  NODE_ENV: production
+                  VITE_APP_ENV: ${{ inputs.stage }}
+
+            # Where the build wrote its files, and how the site routes. Both are
+            # read from the BUILD OUTPUT, never asked: a top-level 404.html next
+            # to at least one <route>/index.html is a multi-page static export
+            # (Next.js output:'export' + trailingSlash, Astro, Hugo…) → routing
+            # `static`; anything else (Vite/CRA SPAs, incl. GitHub-Pages-style
+            # 404.html redirect hacks, which have no <route>/index.html) → `spa`.
+            - name: Resolve build output
+              id: out
+              env:
                   BUILD_DIR_OVERRIDE: ${{ vars.BUILD_DIR }}
               run: |
                   set -euo pipefail
@@ -142,10 +259,148 @@ jobs:
                       echo "::error::Set the vars.BUILD_DIR repo variable if your tool writes elsewhere." >&2
                       exit 1
                   fi
-                  echo "Syncing $build_dir to s3://$BUCKET"
-                  aws s3 sync "$build_dir" "s3://$BUCKET" --delete --no-progress
+                  routing=spa
+                  if [ -f "$build_dir/404.html" ] \
+                      && [ -n "$(find "$build_dir" -mindepth 2 -name index.html -not -path "$build_dir/_next/*" -print -quit)" ]; then
+                      routing=static
+                  fi
+                  echo "build_dir=$build_dir" >> "$GITHUB_OUTPUT"
+                  echo "routing=$routing" >> "$GITHUB_OUTPUT"
+                  echo "Build output: $build_dir (routing: $routing)"
 
+            - name: Configure AWS credentials via OIDC
+              uses: aws-actions/configure-aws-credentials@v4
+              with:
+                  role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+                  aws-region: ${{ env.CLOUD_REGION }}
+
+            # cloud ADR 0028 D5. An imported env's payload carries its
+            # persisted aws_name_prefix; the deploy then owns the stack.
+            # Legacy envs (empty prefix) keep today's hand-applied stack.
+            - name: Resolve infrastructure (create/update the stack for imported envs)
+              id: infra
+              env:
+                  STAGE: ${{ inputs.stage }}
+                  NAME_PREFIX: ${{ fromJson(inputs.payload).aws_name_prefix }}
+                  CFN_ROLE_ARN: ${{ vars.CLOUD_CFN_SERVICE_ROLE_ARN }}
+                  # cloud ADR 0028 D6 — the custom domain and the certificate
+                  # Cloud discovered for it: both, or neither.
+                  CERT_ARN: ${{ fromJson(inputs.payload).acm_cert_arn }}
+                  DOMAIN_ALIASES: ${{ fromJson(inputs.payload).domain_aliases }}
+                  # The one host the site answers on (apex → www 307). Blank
+                  # (the default until the payload carries it) = no redirect.
+                  CANONICAL_HOST: ${{ fromJson(inputs.payload).canonical_host }}
+                  ROUTING_MODE: ${{ steps.out.outputs.routing }}
+              run: |
+                  set -euo pipefail
+                  created=false
+                  if [ -n "${NAME_PREFIX:-}" ]; then
+                      # Defense in depth: Cloud validated this before dispatch.
+                      if [ "${#NAME_PREFIX}" -gt 56 ] || ! printf '%s' "$NAME_PREFIX" | grep -Eq '^cloud-[0-9a-f]{8}-[a-z0-9]+(-[a-z0-9]+)*$'; then
+                          echo "::error::aws_name_prefix is not cloud-<8 hex org key>-<slug>-<env> (at most 56 characters)." >&2
+                          exit 1
+                      fi
+                      case "$NAME_PREFIX" in
+                          *"-${STAGE}") ;;
+                          *) echo "::error::aws_name_prefix does not end with this run's stage '${STAGE}'." >&2; exit 1 ;;
+                      esac
+                      if [ -z "${CFN_ROLE_ARN:-}" ]; then
+                          echo "::error::CLOUD_CFN_SERVICE_ROLE_ARN is not set on the '${STAGE}' GitHub Environment. Cloud's per-app AWS access sets it; the stack is never deployed with the deploy role's own rights." >&2
+                          exit 1
+                      fi
+                      STACK="$NAME_PREFIX"
+                      slug="${NAME_PREFIX#cloud-????????-}"
+                      slug="${slug%-"${STAGE}"}"
+                      if ! describe_err=$(aws cloudformation describe-stacks --stack-name "$STACK" 2>&1 >/dev/null); then
+                          if printf '%s' "$describe_err" | grep -q 'does not exist'; then
+                              created=true
+                          else
+                              echo "::error::Could not read stack $STACK: $describe_err" >&2
+                              exit 1
+                          fi
+                      fi
+                      # Both or neither — and always passed explicitly, because
+                      # `cloudformation deploy` keeps a parameter's previous
+                      # value when it's omitted (a removed domain would stay).
+                      if [ -n "${CERT_ARN:-}" ] || [ -n "${DOMAIN_ALIASES:-}" ]; then
+                          if [ -z "${CERT_ARN:-}" ] || [ -z "${DOMAIN_ALIASES:-}" ]; then
+                              echo "::error::The custom domain and its certificate must come together; got only one." >&2
+                              exit 1
+                          fi
+                          if ! printf '%s' "$CERT_ARN" | grep -Eq '^arn:aws:acm:us-east-1:[0-9]{12}:certificate/[0-9a-f-]{36}$' \
+                              || ! printf '%s' "$DOMAIN_ALIASES" | grep -Eq '^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$'; then
+                              echo "::error::The custom domain or its certificate is malformed." >&2
+                              exit 1
+                          fi
+                      fi
+                      if [ -n "${CANONICAL_HOST:-}" ] && ! printf '%s' "$CANONICAL_HOST" | grep -Eq '^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$'; then
+                          echo "::error::canonical_host is not a lowercase hostname." >&2
+                          exit 1
+                      fi
+                      case "${ROUTING_MODE:-}" in
+                          spa|static) ;;
+                          *) echo "::error::Routing mode '${ROUTING_MODE:-}' is not spa or static." >&2; exit 1 ;;
+                      esac
+                      aws cloudformation deploy \
+                          --stack-name "$STACK" \
+                          --template-file cloudformation/infrastructure.yml \
+                          --role-arn "$CFN_ROLE_ARN" \
+                          --no-fail-on-empty-changeset \
+                          --parameter-overrides "ProjectSlug=${slug}" "EnvironmentName=${STAGE}" "NamePrefix=${NAME_PREFIX}" \
+                              "AcmCertificateArn=${CERT_ARN:-}" "DomainAliases=${DOMAIN_ALIASES:-}" \
+                              "RoutingMode=${ROUTING_MODE}" "CanonicalHost=${CANONICAL_HOST:-}"
+                  else
+                      STACK="cloud-${CLOUD_PROJECT_SLUG}-${STAGE}"
+                  fi
+                  echo "created=$created" >> "$GITHUB_OUTPUT"
+                  bucket=$(aws cloudformation describe-stacks --stack-name "$STACK" --query "Stacks[0].Outputs[?OutputKey=='AssetsBucketName'].OutputValue" --output text)
+                  dist=$(aws cloudformation describe-stacks --stack-name "$STACK" --query "Stacks[0].Outputs[?OutputKey=='DistributionId'].OutputValue" --output text)
+                  if [ -z "$bucket" ] || [ -z "$dist" ]; then
+                      echo "Stack $STACK not found or outputs missing. Apply cloudformation/infrastructure.yml first." >&2
+                      exit 1
+                  fi
+                  echo "bucket=$bucket" >> "$GITHUB_OUTPUT"
+                  echo "dist=$dist" >> "$GITHUB_OUTPUT"
+                  echo "Bucket: $bucket"
+                  echo "Distribution: $dist"
+
+            - name: Sync build output to S3
+              # `--delete` removes objects no longer in the build, keeping the
+              # bucket in lock-step with the deployed bundle.
+              #
+              # The directory comes from "Resolve build output" (out/, dist/,
+              # build/, or vars.BUILD_DIR).
+              #
+              # Next.js exports metadata images (opengraph-image, twitter-image,
+              # icon, apple-icon) WITHOUT an extension, so `s3 sync` would store
+              # them as binary/octet-stream and link previews break. Re-upload
+              # those few with image/png (what Next's ImageResponse renders).
+              env:
+                  BUCKET: ${{ steps.infra.outputs.bucket }}
+                  BUILD_DIR: ${{ steps.out.outputs.build_dir }}
+              run: |
+                  set -euo pipefail
+                  echo "Syncing $BUILD_DIR to s3://$BUCKET"
+                  aws s3 sync "$BUILD_DIR" "s3://$BUCKET" --delete --no-progress
+                  # BEGIN metadata-images
+                  find "$BUILD_DIR" -type f ! -name '*.*' \( \
+                      -name opengraph-image -o -name 'opengraph-image-*' -o \
+                      -name twitter-image -o -name 'twitter-image-*' -o \
+                      -name icon -o -name 'icon-*' -o \
+                      -name apple-icon -o -name 'apple-icon-*' \
+                      \) -print0 | while IFS= read -r -d '' f; do
+                          key="${f#"$BUILD_DIR"/}"
+                          echo "Content-Type image/png: $key"
+                          aws s3 cp "$f" "s3://$BUCKET/$key" --content-type image/png --no-progress
+                      done
+                  # END metadata-images
+
+            # Skipped on the run that CREATED the stack: a brand-new
+            # distribution has nothing cached, and an imported env's deploy
+            # role gets cloudfront:CreateInvalidation only in phase 2, once
+            # the distribution exists (cloud ADR 0028 D4 two-phase apply).
             - name: Invalidate CloudFront cache
+              if: steps.infra.outputs.created != 'true'
               env:
                   DIST: ${{ steps.infra.outputs.dist }}
               run: |
@@ -167,10 +422,11 @@ jobs:
             #
             # HMAC: sha256 over the raw POST body, sent as
             # `X-Admin-Webhook-Signature: sha256=<hex>` (admin ADR
-            # 0019 D3 as shipped in 19a + 19c). Secret resolved from
-            # the GH repo secret `ADMIN_WEBHOOK_SECRET`, which MUST
-            # match the env var named by cloud's WebhookHmacAuth.
-            # secret_env (CLOUD_RUN_COMPLETED_SECRET) on the admin host.
+            # 0019 D3 as shipped in 19a + 19c). Signed with the per-run
+            # webhook_secret input (cloud ADR 0028 D8; masked by the job's
+            # first step) and posted to the per-org route
+            # /v1/plugins/cloud/webhooks/{payload.webhook_org}/run_completed
+            # (admin ADR 0045 D3): the same step as laravel-bref's.
             #
             # ADMIN_WEBHOOK_URL repo variable form:
             #   https://<admin-host>/v1/webhooks
@@ -181,27 +437,39 @@ jobs:
             # we emit a coarse-grained token derived from job.status;
             # operators can drill via provider_run_url for step-level
             # detail.
-            - name: Notify admin — outcome (webhook-IN, ADR 0019)
-              if: always() && inputs.run_id != ''
+            - name: Notify admin — outcome (webhook-IN, ADR 0019 / 0022)
+              if: always() && fromJson(inputs.payload).run_id != ''
               continue-on-error: true
               env:
+                  # WEBHOOK_SECRET comes from $GITHUB_ENV, set (masked)
+                  # by the job's first step — never mapped here.
                   WEBHOOK_URL:    ${{ vars.ADMIN_WEBHOOK_URL }}
-                  WEBHOOK_SECRET: ${{ secrets.ADMIN_WEBHOOK_SECRET }}
-                  RUN_ID:         ${{ inputs.run_id }}
+                  WEBHOOK_ORG:    ${{ fromJson(inputs.payload).webhook_org }}
+                  RUN_ID:         ${{ fromJson(inputs.payload).run_id }}
                   GIT_SHA:        ${{ github.sha }}
                   RUN_URL:        ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
                   JOB_STATUS:     ${{ job.status }}
                   STARTED_AT:     ${{ env.DEPLOY_STARTED_AT }}
               run: |
                   set -euo pipefail
+                  if [ -n "${WEBHOOK_SECRET:-}" ]; then
+                      echo "::add-mask::$WEBHOOK_SECRET"
+                  fi
                   if [ -z "${WEBHOOK_URL:-}" ]; then
                       echo "::warning::ADMIN_WEBHOOK_URL repo variable not set — skipping webhook callback."
                       exit 0
                   fi
                   if [ -z "${WEBHOOK_SECRET:-}" ]; then
-                      echo "::warning::ADMIN_WEBHOOK_SECRET repo secret not set — skipping webhook callback (HMAC verification would 401 on admin)."
+                      echo "::warning::webhook_secret input is empty (set the project's webhook_secret setting in admin) — skipping webhook callback."
                       exit 0
                   fi
+                  if ! [[ "${WEBHOOK_ORG:-}" =~ ^org_[0-9a-f]{32}$ ]]; then
+                      echo "::warning::payload.webhook_org is missing or malformed — skipping webhook callback."
+                      exit 0
+                  fi
+                  # https://<admin-host>/v1/webhooks -> https://<admin-host>/v1
+                  api_base="${WEBHOOK_URL%/}"
+                  api_base="${api_base%/webhooks}"
                   outcome=$([ "$JOB_STATUS" = "success" ] && echo "succeeded" || echo "failed")
                   finished_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
                   if [ "$outcome" = "failed" ]; then
@@ -222,9 +490,8 @@ jobs:
                       --argjson failure_summary "$([ "$failure_summary" = null ] && echo null || jq -Rn --arg s "$failure_summary" '$s')" \
                       '{run_id:$run_id, status:$status, git_sha:$git_sha, started_at:$started_at, finished_at:$finished_at, provider_run_url:$provider_run_url, failure_step:$failure_step, failure_summary:$failure_summary}')
                   sig=$(printf '%s' "$payload" | openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" -hex | awk '{print $2}')
-                  # POST to admin's PluginWebhookController route:
-                  #   POST /v1/webhooks/cloud/run_completed
-                  curl -fsS -X POST "$WEBHOOK_URL/cloud/run_completed" \
+                  # Per-org route (admin ADR 0045 D3; VerifyOrgWebhookHmac).
+                  curl -fsS -X POST "$api_base/plugins/cloud/webhooks/$WEBHOOK_ORG/run_completed" \
                       -H "Content-Type: application/json" \
                       -H "X-Admin-Webhook-Signature: sha256=$sig" \
                       -d "$payload" || true
