@@ -7,9 +7,12 @@
 #   2. Phase 3+:  admin's deploy-trigger endpoint dispatches this via
 #                 the GitHub workflow_dispatch API, passing run_id.
 #
-# Required GitHub repository secrets:
+# Required GitHub Environment variable (on each stage's Environment):
 #   AWS_DEPLOY_ROLE_ARN  IAM role ARN. Trust policy template at
 #                        iam-trust-policy.template.json.
+#   (A variable, not a secret — Security, 2026-09-29: the ARN isn't sensitive;
+#   the role's trust policy is what gates it. Cloud sets it on each stage's
+#   GitHub Environment.)
 #
 # Required GitHub repository variables:
 #   CLOUD_PROJECT_SLUG   Your admin cloud_project.slug.
@@ -44,15 +47,14 @@ name: Deploy via SiteSource Cloud
 on:
     workflow_dispatch:
         inputs:
+            # A string, not a fixed choice: an app can have any environment
+            # Cloud created (cloud ADR 0030 D3 add-environment, e.g. "qa"). The
+            # `validate` job below checks it before anything uses it.
             stage:
-                description: 'Environment stage (production / staging / preview)'
+                description: 'Environment name (e.g. production, staging, qa): lowercase letters, digits, single hyphens'
                 required: true
-                type: choice
+                type: string
                 default: staging
-                options:
-                    - staging
-                    - production
-                    - preview
             # ADR 0024 — cap-relief. Non-secret scalars (run_id,
             # change_kind, etc.) bundled into one JSON payload.
             # admin dispatches the same 6-input shape to all stubs.
@@ -101,7 +103,32 @@ env:
     CLOUD_REGION: ${{ vars.CLOUD_REGION || 'us-east-1' }}
 
 jobs:
+    # BEGIN validate-stage
+    # Runs before every other job (each `needs: validate`): `stage` is a free
+    # string now, and it names the GitHub Environment (react-spa), the AWS
+    # stack and the build's stage — so it must be a Cloud environment name,
+    # the AwsNames segment rule, before any of that happens. No permissions,
+    # no secrets, no environment.
+    validate:
+        runs-on: ubuntu-latest
+        permissions: {}
+        steps:
+            - name: Validate the stage name
+              env:
+                  STAGE: ${{ inputs.stage }}
+              run: |
+                  set -euo pipefail
+                  # [[ =~ ]] matches the WHOLE value; `printf | grep` would accept a
+                  # multi-line value whose first line matched.
+                  name='^[a-z0-9]+(-[a-z0-9]+)*$'
+                  if [ "${#STAGE}" -gt 64 ] || ! [[ "$STAGE" =~ $name ]]; then
+                      echo "::error::The stage must be a Cloud environment name: lowercase letters, digits and single hyphens (at most 64)." >&2
+                      exit 1
+                  fi
+    # END validate-stage
+
     deploy:
+        needs: validate
         runs-on: ubuntu-latest
         # Puts `environment:<stage>` into the OIDC sub claim GitHub mints for
         # this job (e.g. repo:OWNER/REPO:environment:production) — this is
@@ -271,7 +298,7 @@ jobs:
             - name: Configure AWS credentials via OIDC
               uses: aws-actions/configure-aws-credentials@v4
               with:
-                  role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+                  role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
                   aws-region: ${{ env.CLOUD_REGION }}
 
             # cloud ADR 0028 D5. An imported env's payload carries its
@@ -296,7 +323,7 @@ jobs:
                   created=false
                   if [ -n "${NAME_PREFIX:-}" ]; then
                       # Defense in depth: Cloud validated this before dispatch.
-                      if [ "${#NAME_PREFIX}" -gt 56 ] || ! printf '%s' "$NAME_PREFIX" | grep -Eq '^cloud-[0-9a-f]{8}-[a-z0-9]+(-[a-z0-9]+)*$'; then
+                      if [ "${#NAME_PREFIX}" -gt 56 ] || ! [[ "$NAME_PREFIX" =~ ^cloud-[0-9a-f]{8}-[a-z0-9]+(-[a-z0-9]+)*$ ]]; then
                           echo "::error::aws_name_prefix is not cloud-<8 hex org key>-<slug>-<env> (at most 56 characters)." >&2
                           exit 1
                       fi
@@ -327,13 +354,13 @@ jobs:
                               echo "::error::The custom domain and its certificate must come together; got only one." >&2
                               exit 1
                           fi
-                          if ! printf '%s' "$CERT_ARN" | grep -Eq '^arn:aws:acm:us-east-1:[0-9]{12}:certificate/[0-9a-f-]{36}$' \
-                              || ! printf '%s' "$DOMAIN_ALIASES" | grep -Eq '^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$'; then
+                          if ! [[ "$CERT_ARN" =~ ^arn:aws:acm:us-east-1:[0-9]{12}:certificate/[0-9a-f-]{36}$ ]] \
+                              || ! [[ "$DOMAIN_ALIASES" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$ ]]; then
                               echo "::error::The custom domain or its certificate is malformed." >&2
                               exit 1
                           fi
                       fi
-                      if [ -n "${CANONICAL_HOST:-}" ] && ! printf '%s' "$CANONICAL_HOST" | grep -Eq '^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$'; then
+                      if [ -n "${CANONICAL_HOST:-}" ] && ! [[ "$CANONICAL_HOST" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$ ]]; then
                           echo "::error::canonical_host is not a lowercase hostname." >&2
                           exit 1
                       fi
