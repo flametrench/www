@@ -388,6 +388,11 @@ jobs:
                   fi
                   echo "bucket=$bucket" >> "$GITHUB_OUTPUT"
                   echo "dist=$dist" >> "$GITHUB_OUTPUT"
+                  # "Visit site": the distribution's own domain, sent in run_completed. Best effort.
+                  domain=$(aws cloudformation describe-stacks --stack-name "$STACK" --query "Stacks[0].Outputs[?OutputKey=='DistributionDomain'].OutputValue | [0]" --output text 2>/dev/null || true)
+                  if [[ "$domain" =~ ^[a-z0-9]+\.cloudfront\.net$ ]]; then
+                      echo "SITE_URL=https://$domain/" >> "$GITHUB_ENV"
+                  fi
                   echo "Bucket: $bucket"
                   echo "Distribution: $dist"
 
@@ -513,9 +518,10 @@ jobs:
                       --arg started_at       "$STARTED_AT" \
                       --arg finished_at      "$finished_at" \
                       --arg provider_run_url "$RUN_URL" \
+                      --arg site_url         "${SITE_URL:-}" \
                       --argjson failure_step    "$([ "$failure_step"    = null ] && echo null || jq -Rn --arg s "$failure_step"    '$s')" \
                       --argjson failure_summary "$([ "$failure_summary" = null ] && echo null || jq -Rn --arg s "$failure_summary" '$s')" \
-                      '{run_id:$run_id, status:$status, git_sha:$git_sha, started_at:$started_at, finished_at:$finished_at, provider_run_url:$provider_run_url, failure_step:$failure_step, failure_summary:$failure_summary}')
+                      '{run_id:$run_id, status:$status, git_sha:$git_sha, started_at:$started_at, finished_at:$finished_at, provider_run_url:$provider_run_url, failure_step:$failure_step, failure_summary:$failure_summary, site_url:(if $site_url == "" then null else $site_url end)}')
                   sig=$(printf '%s' "$payload" | openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" -hex | awk '{print $2}')
                   # Per-org route (admin ADR 0045 D3; VerifyOrgWebhookHmac).
                   curl -fsS -X POST "$api_base/plugins/cloud/webhooks/$WEBHOOK_ORG/run_completed" \
