@@ -117,9 +117,11 @@ Resources:
                 SigningBehavior: always
                 SigningProtocol: sigv4
 
-    # Matches what the site had on Vercel: HSTS for two years (the managed
-    # SecurityHeadersPolicy sends one year), plus the managed policy's other
-    # headers unchanged.
+    # HSTS for two years (the managed SecurityHeadersPolicy sends one year),
+    # plus the managed policy's other headers unchanged. This is NOT the
+    # header set a site may have had on Vercel: there is no
+    # Content-Security-Policy, Permissions-Policy, COOP or CORP, frames are
+    # SAMEORIGIN, and nothing here is per-app yet.
     ResponseHeaders:
         Type: AWS::CloudFront::ResponseHeadersPolicy
         Properties:

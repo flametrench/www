@@ -491,9 +491,13 @@ jobs:
             # we emit a coarse-grained token derived from job.status;
             # operators can drill via provider_run_url for step-level
             # detail.
+            # A deploy Cloud never hears about sits at "Deploying…" until
+            # Cloud's 90-minute sweep, and a green step here hid that
+            # (site-source-web staging, 2026-10-23). So a callback that
+            # can't be sent, or that admin doesn't accept, fails this step
+            # and the job, loudly (cloud-pm); the sweep stays the backstop.
             - name: Notify admin — outcome (webhook-IN, ADR 0019 / 0022)
               if: always() && fromJson(inputs.payload).run_id != ''
-              continue-on-error: true
               env:
                   # WEBHOOK_SECRET comes from $GITHUB_ENV, set (masked)
                   # by the job's first step — never mapped here.
@@ -510,16 +514,16 @@ jobs:
                       echo "::add-mask::$WEBHOOK_SECRET"
                   fi
                   if [ -z "${WEBHOOK_URL:-}" ]; then
-                      echo "::warning::ADMIN_WEBHOOK_URL repo variable not set — skipping webhook callback."
-                      exit 0
+                      echo "::error::ADMIN_WEBHOOK_URL isn't set on this GitHub Environment, so Cloud can't be told how this deploy went. In Cloud, run Sync with GitHub on this environment, then deploy again."
+                      exit 1
                   fi
                   if [ -z "${WEBHOOK_SECRET:-}" ]; then
-                      echo "::warning::webhook_secret input is empty (set the project's webhook_secret setting in admin) — skipping webhook callback."
-                      exit 0
+                      echo "::error::This run has no webhook_secret, so Cloud can't be told how this deploy went. Deploy again from Cloud."
+                      exit 1
                   fi
                   if ! [[ "${WEBHOOK_ORG:-}" =~ ^org_[0-9a-f]{32}$ ]]; then
-                      echo "::warning::payload.webhook_org is missing or malformed — skipping webhook callback."
-                      exit 0
+                      echo "::error::This run's payload.webhook_org is missing or malformed, so Cloud can't be told how this deploy went. Deploy again from Cloud."
+                      exit 1
                   fi
                   # https://<admin-host>/v1/webhooks -> https://<admin-host>/v1
                   api_base="${WEBHOOK_URL%/}"
@@ -546,7 +550,10 @@ jobs:
                       '{run_id:$run_id, status:$status, git_sha:$git_sha, started_at:$started_at, finished_at:$finished_at, provider_run_url:$provider_run_url, failure_step:$failure_step, failure_summary:$failure_summary, site_url:(if $site_url == "" then null else $site_url end)}')
                   sig=$(printf '%s' "$payload" | openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" -hex | awk '{print $2}')
                   # Per-org route (admin ADR 0045 D3; VerifyOrgWebhookHmac).
-                  curl -fsS -X POST "$api_base/plugins/cloud/webhooks/$WEBHOOK_ORG/run_completed" \
+                  if ! curl -fsS -X POST "$api_base/plugins/cloud/webhooks/$WEBHOOK_ORG/run_completed" \
                       -H "Content-Type: application/json" \
                       -H "X-Admin-Webhook-Signature: sha256=$sig" \
-                      -d "$payload" || true
+                      -d "$payload"; then
+                      echo "::error::Cloud didn't accept this deploy's outcome (the error is above). Cloud marks the deploy failed after 90 minutes; check it in Cloud before deploying again."
+                      exit 1
+                  fi
