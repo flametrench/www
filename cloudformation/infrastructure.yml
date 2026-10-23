@@ -138,6 +138,13 @@ Rules:
         Assertions:
             - Assert: !Or [!Equals [!Ref HstsPreload, 'false'], !Equals [!Ref HstsIncludeSubdomains, 'true']]
               AssertDescription: HSTS preload needs includeSubDomains (preload lists refuse a header without it).
+    # Without a canonical host, NoIndex holds: production on its own domain would be
+    # hidden from search engines. Refuse before any stack update (Cloud refuses first).
+    ProductionDomainNeedsCanonicalHost:
+        RuleCondition: !And [!Equals [!Ref NonProduction, 'false'], !Not [!Equals [!Ref AcmCertificateArn, '']]]
+        Assertions:
+            - Assert: !Not [!Equals [!Ref CanonicalHost, '']]
+              AssertDescription: A production environment with a custom domain needs CanonicalHost, or it would be served with noindex.
 
 Conditions:
     HasCustomDomain: !Not [!Equals [!Ref AcmCertificateArn, '']]
