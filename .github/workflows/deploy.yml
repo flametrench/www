@@ -354,14 +354,36 @@ jobs:
                               echo "::error::The custom domain and its certificate must come together; got only one." >&2
                               exit 1
                           fi
-                          if ! [[ "$CERT_ARN" =~ ^arn:aws:acm:us-east-1:[0-9]{12}:certificate/[0-9a-f-]{36}$ ]] \
-                              || ! [[ "$DOMAIN_ALIASES" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$ ]]; then
+                          # cloud ADR 0031 D3: one certificate, several names — a comma-separated
+                          # list (the template's CommaDelimitedList), each a lowercase hostname.
+                          aliases_ok=true
+                          # The whole value first: `read` stops at a newline, so without this a
+                          # second line would reach CloudFormation unchecked (QA/Security on #217).
+                          [[ "$DOMAIN_ALIASES" =~ ^[a-z0-9.,-]+$ ]] || aliases_ok=false
+                          IFS=, read -r -a alias_list <<< "$DOMAIN_ALIASES"
+                          [ "${#alias_list[@]}" -ge 1 ] && [ "${#alias_list[@]}" -le 100 ] || aliases_ok=false
+                          seen_aliases=,
+                          for alias in "${alias_list[@]}"; do
+                              [[ "$alias" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$ ]] || aliases_ok=false
+                              # CloudFront refuses a repeated alias later; refuse it here, plainly.
+                              case "$seen_aliases" in *",${alias},"*) aliases_ok=false ;; esac
+                              seen_aliases="${seen_aliases}${alias},"
+                          done
+                          case "$DOMAIN_ALIASES" in ,*|*,|*,,*) aliases_ok=false ;; esac
+                          if ! [[ "$CERT_ARN" =~ ^arn:aws:acm:us-east-1:[0-9]{12}:certificate/[0-9a-f-]{36}$ ]] || [ "$aliases_ok" != true ]; then
                               echo "::error::The custom domain or its certificate is malformed." >&2
                               exit 1
                           fi
                       fi
                       if [ -n "${CANONICAL_HOST:-}" ] && ! [[ "$CANONICAL_HOST" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$ ]]; then
                           echo "::error::canonical_host is not a lowercase hostname." >&2
+                          exit 1
+                      fi
+                      # ADR 0031 D6: every other name redirects to the canonical one, so it
+                      # must be a name this distribution serves — else the whole site
+                      # redirects to a host that isn't attached.
+                      if [ -n "${CANONICAL_HOST:-}" ] && [[ ",${DOMAIN_ALIASES:-}," != *",${CANONICAL_HOST},"* ]]; then
+                          echo "::error::canonical_host is not one of this environment's domains." >&2
                           exit 1
                       fi
                       case "${ROUTING_MODE:-}" in
