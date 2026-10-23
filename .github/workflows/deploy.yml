@@ -318,6 +318,16 @@ jobs:
                   # (the default until the payload carries it) = no redirect.
                   CANONICAL_HOST: ${{ fromJson(inputs.payload).canonical_host }}
                   ROUTING_MODE: ${{ steps.out.outputs.routing }}
+                  # cloud ADR 0028 D10 — the env's security headers, Cloud
+                  # settings (never this repo). NON_PRODUCTION is Cloud's tier.
+                  CSP: ${{ fromJson(inputs.payload).csp }}
+                  CSP_REPORT_ONLY: ${{ fromJson(inputs.payload).csp_report_only }}
+                  PERMISSIONS_POLICY: ${{ fromJson(inputs.payload).permissions_policy }}
+                  COOP: ${{ fromJson(inputs.payload).cross_origin_opener_policy }}
+                  CORP: ${{ fromJson(inputs.payload).cross_origin_resource_policy }}
+                  HSTS_INCLUDE_SUBDOMAINS: ${{ fromJson(inputs.payload).hsts_include_subdomains }}
+                  HSTS_PRELOAD: ${{ fromJson(inputs.payload).hsts_preload }}
+                  NON_PRODUCTION: ${{ fromJson(inputs.payload).non_production }}
               run: |
                   set -euo pipefail
                   created=false
@@ -390,6 +400,32 @@ jobs:
                           spa|static) ;;
                           *) echo "::error::Routing mode '${ROUTING_MODE:-}' is not spa or static." >&2; exit 1 ;;
                       esac
+                      # Defense in depth: Cloud validated these before dispatch (D10).
+                      # A payload without them is from an older Cloud: refuse rather
+                      # than deploy production as indexable or the headers as blank.
+                      # BEGIN header-check
+                      headers_ok=true
+                      for v in "${CSP:-}" "${CSP_REPORT_ONLY:-}" "${PERMISSIONS_POLICY:-}"; do
+                          # One line of printable ASCII, at most 1,783 bytes. Counts bytes
+                          # outside ' '..'~' (C locale), so a newline counts too; grep, being
+                          # line-based, wouldn't see one.
+                          len=$(printf '%s' "$v" | LC_ALL=C wc -c)
+                          bad=$(printf '%s' "$v" | LC_ALL=C tr -d ' -~' | LC_ALL=C wc -c)
+                          if [ $((len)) -gt 1783 ] || [ $((bad)) -ne 0 ]; then
+                              headers_ok=false
+                          fi
+                      done
+                      case "${COOP:-}" in ''|same-origin|same-origin-allow-popups|noopener-allow-popups|unsafe-none) ;; *) headers_ok=false ;; esac
+                      case "${CORP:-}" in ''|same-origin|same-site|cross-origin) ;; *) headers_ok=false ;; esac
+                      for b in "${HSTS_INCLUDE_SUBDOMAINS:-}" "${HSTS_PRELOAD:-}" "${NON_PRODUCTION:-}"; do
+                          case "$b" in true|false) ;; *) headers_ok=false ;; esac
+                      done
+                      [ "${HSTS_PRELOAD:-}" != true ] || [ "${HSTS_INCLUDE_SUBDOMAINS:-}" = true ] || headers_ok=false
+                      if [ "$headers_ok" != true ]; then
+                          echo "::error::This environment's security headers in the payload are missing or malformed. Deploy again from Cloud." >&2
+                          exit 1
+                      fi
+                      # END header-check
                       aws cloudformation deploy \
                           --stack-name "$STACK" \
                           --template-file cloudformation/infrastructure.yml \
@@ -397,7 +433,11 @@ jobs:
                           --no-fail-on-empty-changeset \
                           --parameter-overrides "ProjectSlug=${slug}" "EnvironmentName=${STAGE}" "NamePrefix=${NAME_PREFIX}" \
                               "AcmCertificateArn=${CERT_ARN:-}" "DomainAliases=${DOMAIN_ALIASES:-}" \
-                              "RoutingMode=${ROUTING_MODE}" "CanonicalHost=${CANONICAL_HOST:-}"
+                              "RoutingMode=${ROUTING_MODE}" "CanonicalHost=${CANONICAL_HOST:-}" \
+                              "ContentSecurityPolicy=${CSP:-}" "ContentSecurityPolicyReportOnly=${CSP_REPORT_ONLY:-}" \
+                              "PermissionsPolicy=${PERMISSIONS_POLICY:-}" "CrossOriginOpenerPolicy=${COOP:-}" "CrossOriginResourcePolicy=${CORP:-}" \
+                              "HstsIncludeSubdomains=${HSTS_INCLUDE_SUBDOMAINS}" "HstsPreload=${HSTS_PRELOAD}" \
+                              "NonProduction=${NON_PRODUCTION}"
                   else
                       STACK="cloud-${CLOUD_PROJECT_SLUG}-${STAGE}"
                   fi

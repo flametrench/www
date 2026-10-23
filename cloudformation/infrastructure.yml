@@ -78,12 +78,83 @@ Parameters:
         AllowedPattern: '^([a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+)?$'
         MaxLength: 253
 
+    # cloud ADR 0028 D10: the security headers are Cloud settings on each
+    # environment (set by a Cloud admin), never values in this file. The deploy
+    # workflow passes all of them on every deploy.
+    ContentSecurityPolicy:
+        Type: String
+        Default: ''
+        Description: Optional. The Content-Security-Policy value. Blank = no header.
+        AllowedPattern: '^[ -~]*$'
+        MaxLength: 1783
+
+    ContentSecurityPolicyReportOnly:
+        Type: String
+        Default: ''
+        Description: Optional. The Content-Security-Policy-Report-Only value. Blank = no header.
+        AllowedPattern: '^[ -~]*$'
+        MaxLength: 1783
+
+    PermissionsPolicy:
+        Type: String
+        Default: ''
+        Description: Optional. The Permissions-Policy value. Blank = no header.
+        AllowedPattern: '^[ -~]*$'
+        MaxLength: 1783
+
+    CrossOriginOpenerPolicy:
+        Type: String
+        Default: ''
+        Description: Optional. Blank = no header. same-origin breaks sign-in and payment popups.
+        AllowedValues: ['', same-origin, same-origin-allow-popups, noopener-allow-popups, unsafe-none]
+
+    CrossOriginResourcePolicy:
+        Type: String
+        Default: ''
+        Description: Optional. Blank = no header. same-origin stops other sites embedding this one's files.
+        AllowedValues: ['', same-origin, same-site, cross-origin]
+
+    HstsIncludeSubdomains:
+        Type: String
+        Default: 'false'
+        AllowedValues: ['false', 'true']
+
+    HstsPreload:
+        Type: String
+        Default: 'false'
+        AllowedValues: ['false', 'true']
+        Description: Preloading is hard to undo, and needs HstsIncludeSubdomains.
+
+    NonProduction:
+        Type: String
+        Default: 'true'
+        AllowedValues: ['true', 'false']
+        Description: >-
+            Derived by Cloud from the environment's tier, never input. A stack
+            applied without it counts as non-production, so it isn't indexed.
+
+Rules:
+    PreloadNeedsIncludeSubdomains:
+        Assertions:
+            - Assert: !Or [!Equals [!Ref HstsPreload, 'false'], !Equals [!Ref HstsIncludeSubdomains, 'true']]
+              AssertDescription: HSTS preload needs includeSubDomains (preload lists refuse a header without it).
+
 Conditions:
     HasCustomDomain: !Not [!Equals [!Ref AcmCertificateArn, '']]
     HasNamePrefix: !Not [!Equals [!Ref NamePrefix, '']]
     IsStaticRouting: !Equals [!Ref RoutingMode, static]
     HasCanonicalHost: !Not [!Equals [!Ref CanonicalHost, '']]
     NeedsViewerFunction: !Or [!Condition IsStaticRouting, !Condition HasCanonicalHost]
+    HasCsp: !Not [!Equals [!Ref ContentSecurityPolicy, '']]
+    HasCspReportOnly: !Not [!Equals [!Ref ContentSecurityPolicyReportOnly, '']]
+    HasPermissionsPolicy: !Not [!Equals [!Ref PermissionsPolicy, '']]
+    HasCoop: !Not [!Equals [!Ref CrossOriginOpenerPolicy, '']]
+    HasCorp: !Not [!Equals [!Ref CrossOriginResourcePolicy, '']]
+    IsNonProduction: !Equals [!Ref NonProduction, 'true']
+    # ADR 0028 D10: noindex unless production with its own domain and a
+    # canonical host (which sends *.cloudfront.net and the apex to that host).
+    NoIndex: !Or [!Condition IsNonProduction, !Not [!Condition HasCustomDomain], !Not [!Condition HasCanonicalHost]]
+    HasCustomHeaders: !Or [!Condition HasCspReportOnly, !Condition HasPermissionsPolicy, !Condition HasCoop, !Condition HasCorp, !Condition NoIndex]
 
 Resources:
     AssetsBucket:
@@ -117,11 +188,12 @@ Resources:
                 SigningBehavior: always
                 SigningProtocol: sigv4
 
-    # HSTS for two years (the managed SecurityHeadersPolicy sends one year),
-    # plus the managed policy's other headers unchanged. This is NOT the
-    # header set a site may have had on Vercel: there is no
-    # Content-Security-Policy, Permissions-Policy, COOP or CORP, frames are
-    # SAMEORIGIN, and nothing here is per-app yet.
+    # HSTS for two years. CSP, CSP-Report-Only, Permissions-Policy, COOP, CORP
+    # and the HSTS flags are Cloud's per-environment settings (ADR 0028 D10),
+    # each absent or false unless set. X-Robots-Tag per NoIndex. Frames stay
+    # SAMEORIGIN for every site (a site that wants none sets frame-ancestors
+    # 'none' in its CSP). No X-XSS-Protection: deprecated, and its filter was an
+    # XSS vector.
     ResponseHeaders:
         Type: AWS::CloudFront::ResponseHeadersPolicy
         Properties:
@@ -134,8 +206,8 @@ Resources:
                 SecurityHeadersConfig:
                     StrictTransportSecurity:
                         AccessControlMaxAgeSec: 63072000
-                        IncludeSubdomains: false
-                        Preload: false
+                        IncludeSubdomains: !Ref HstsIncludeSubdomains
+                        Preload: !Ref HstsPreload
                         Override: true
                     ContentTypeOptions:
                         Override: true
@@ -144,11 +216,48 @@ Resources:
                         Override: false
                     ReferrerPolicy:
                         ReferrerPolicy: strict-origin-when-cross-origin
-                        Override: false
-                    XSSProtection:
-                        Protection: true
-                        ModeBlock: true
-                        Override: false
+                        Override: true
+                    ContentSecurityPolicy: !If
+                        - HasCsp
+                        - ContentSecurityPolicy: !Ref ContentSecurityPolicy
+                          Override: true
+                        - !Ref 'AWS::NoValue'
+                # SecurityHeadersConfig can't send Report-Only. CloudFront
+                # refuses an empty Items list, hence the outer !If.
+                CustomHeadersConfig: !If
+                    - HasCustomHeaders
+                    - Items:
+                          - !If
+                            - HasCspReportOnly
+                            - Header: Content-Security-Policy-Report-Only
+                              Value: !Ref ContentSecurityPolicyReportOnly
+                              Override: true
+                            - !Ref 'AWS::NoValue'
+                          - !If
+                            - HasPermissionsPolicy
+                            - Header: Permissions-Policy
+                              Value: !Ref PermissionsPolicy
+                              Override: true
+                            - !Ref 'AWS::NoValue'
+                          - !If
+                            - HasCoop
+                            - Header: Cross-Origin-Opener-Policy
+                              Value: !Ref CrossOriginOpenerPolicy
+                              Override: true
+                            - !Ref 'AWS::NoValue'
+                          - !If
+                            - HasCorp
+                            - Header: Cross-Origin-Resource-Policy
+                              Value: !Ref CrossOriginResourcePolicy
+                              Override: true
+                            - !Ref 'AWS::NoValue'
+                          - !If
+                            - NoIndex
+                            - Header: X-Robots-Tag
+                              Value: 'noindex, nofollow'
+                              Override: true
+                            - !Ref 'AWS::NoValue'
+                    - !Ref 'AWS::NoValue'
 
     # Viewer-request routing. Only created when needed (static routing or a
     # canonical host), so an SPA stack with no domain is unchanged. Plain ES5
