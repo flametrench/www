@@ -80,8 +80,10 @@ Parameters:
 
     # cloud ADR 0028 D10 (rewritten 2026-10-24): the site's headers come from a
     # `_headers` file in its build output, read and validated by the deploy
-    # workflow, on top of the platform floor below, which they can only tighten.
-    # The workflow passes all of them on every deploy; these limits back up its check.
+    # workflow, on top of the platform floor below. It may add CSP, CSP-Report-Only,
+    # Permissions-Policy, COOP and CORP, and tighten HSTS (includeSubDomains) and
+    # frames (DENY); nothing can loosen the floor. The workflow passes all of them
+    # on every deploy; these limits back up its check.
     ContentSecurityPolicy:
         Type: String
         Default: ''

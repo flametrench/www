@@ -299,8 +299,10 @@ jobs:
             # floor plus an optional `_headers` file in the build output, in a strict subset of the
             # Netlify/Cloudflare format (a file valid here is valid there). Validated in full before
             # anything is written to GITHUB_OUTPUT (a newline would inject outputs); an error names the
-            # line number and the rule, never the line. It can only tighten the floor. A build tool or a
-            # dependency can write it (it's in the build output): the same trust as the site's own code.
+            # line number and the rule, never the line. It may add CSP, CSP-Report-Only, Permissions-Policy,
+            # COOP and CORP, and tighten HSTS (includeSubDomains) and frames (DENY); nothing can loosen the
+            # floor. A build tool or a dependency can write it (it's in the build output): the same trust as
+            # the site's own code.
             - name: Read headers (_headers)
               id: headersfile
               env:
