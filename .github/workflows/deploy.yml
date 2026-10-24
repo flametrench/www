@@ -726,6 +726,14 @@ jobs:
                   if [ -s "${RUNNER_TEMP:-/nonexistent}/cloud-effective-headers.json" ] && jq -e 'type == "object" and .kind == "configured" and (.items | type) == "array"' "$RUNNER_TEMP/cloud-effective-headers.json" >/dev/null 2>&1; then
                       headers=$(jq -c . "$RUNNER_TEMP/cloud-effective-headers.json")
                   fi
+                  # The commit this job checked out (subject, author, branch), for Cloud's run list (U1). Read
+                  # from the checkout, so no GitHub permission is needed. If git can't say, it's null and the
+                  # deploy goes on: metadata never fails a deploy. Cloud sanitises it again (one line, capped).
+                  commit=null
+                  if c_subject=$(git log -1 --format=%s 2>/dev/null) && c_author=$(git log -1 --format=%an 2>/dev/null) && [ -n "$c_subject" ]; then
+                      commit=$(jq -nc --arg subject "${c_subject:0:300}" --arg author "${c_author:0:120}" --arg branch "${GITHUB_REF_NAME:-}" \
+                          '{subject:$subject, author:(if $author == "" then null else $author end), branch:(if $branch == "" then null else $branch end)}' 2>/dev/null) || commit=null
+                  fi
                   payload=$(jq -nc \
                       --arg run_id           "$RUN_ID" \
                       --arg status           "$outcome" \
@@ -737,7 +745,8 @@ jobs:
                       --argjson failure_step    "$([ "$failure_step"    = null ] && echo null || jq -Rn --arg s "$failure_step"    '$s')" \
                       --argjson failure_summary "$([ "$failure_summary" = null ] && echo null || jq -Rn --arg s "$failure_summary" '$s')" \
                       --argjson headers         "$headers" \
-                      '{run_id:$run_id, status:$status, git_sha:$git_sha, started_at:$started_at, finished_at:$finished_at, provider_run_url:$provider_run_url, failure_step:$failure_step, failure_summary:$failure_summary, site_url:(if $site_url == "" then null else $site_url end), headers:$headers}')
+                      --argjson commit          "$commit" \
+                      '{run_id:$run_id, status:$status, git_sha:$git_sha, started_at:$started_at, finished_at:$finished_at, provider_run_url:$provider_run_url, failure_step:$failure_step, failure_summary:$failure_summary, site_url:(if $site_url == "" then null else $site_url end), headers:$headers, commit:$commit}')
                   sig=$(printf '%s' "$payload" | openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" -hex | awk '{print $2}')
                   # Per-org route (admin ADR 0045 D3; VerifyOrgWebhookHmac).
                   if ! curl -fsS -X POST "$api_base/plugins/cloud/webhooks/$WEBHOOK_ORG/run_completed" \
