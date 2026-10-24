@@ -98,6 +98,14 @@ permissions:
     id-token: write
     contents: read
 
+# cloud ADR 0030 D7d rule 4: one run at a time per environment. Cloud puts the environment's id in
+# every payload as concurrency_key; a payload without one (an older Cloud, or the preview-domain
+# setup, which has no environment) gets its own group, so it never shares one: GitHub keeps one
+# pending run per group and replaces it, which must only ever drop an older push of the same env.
+concurrency:
+    group: cloud-${{ fromJson(inputs.payload).concurrency_key || github.run_id }}
+    cancel-in-progress: false
+
 env:
     CLOUD_PROJECT_SLUG: ${{ vars.CLOUD_PROJECT_SLUG }}
     CLOUD_REGION: ${{ vars.CLOUD_REGION || 'us-east-1' }}
