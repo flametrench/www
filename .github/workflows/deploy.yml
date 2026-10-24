@@ -295,6 +295,108 @@ jobs:
                   echo "routing=$routing" >> "$GITHUB_OUTPUT"
                   echo "Build output: $build_dir (routing: $routing)"
 
+            # cloud ADR 0028 D10 (rewritten 2026-10-24, cloud PR 293): the site's headers are the platform
+            # floor plus an optional `_headers` file in the build output, in a strict subset of the
+            # Netlify/Cloudflare format (a file valid here is valid there). Validated in full before
+            # anything is written to GITHUB_OUTPUT (a newline would inject outputs); an error names the
+            # line number and the rule, never the line. It may add CSP, CSP-Report-Only, Permissions-Policy,
+            # COOP and CORP, and tighten HSTS (includeSubDomains) and frames (DENY); nothing can loosen the
+            # floor. A build tool or a dependency can write it (it's in the build output): the same trust as
+            # the site's own code.
+            - name: Read headers (_headers)
+              id: headersfile
+              env:
+                  BUILD_DIR: ${{ steps.out.outputs.build_dir }}
+              run: |
+                  set -euo pipefail
+                  # BEGIN headers-parse
+                  f="$BUILD_DIR/_headers"
+                  csp='' cspro='' pp='' coop='' corp='' sub=false xfo=SAMEORIGIN
+                  fail() { echo "::error::[adr-0028] _headers $1" >&2; exit 1; }
+                  rtrim() { local s="$1"; printf '%s' "${s%"${s##*[! ]}"}"; }
+                  ltrim() { local s="$1"; printf '%s' "${s#"${s%%[! ]*}"}"; }
+                  if [ -e "$f" ] || [ -L "$f" ]; then
+                      if [ -L "$f" ] || [ ! -f "$f" ]; then
+                          fail "must be a regular file in the build output; a symlink is refused."
+                      fi
+                      if [ "$(LC_ALL=C wc -c < "$f")" -gt 65536 ]; then
+                          fail "is over 64 KiB."
+                      fi
+                      # bash's read drops NUL bytes silently (QA on cloud PR 292), so compare the byte counts.
+                      if [ "$(LC_ALL=C tr -d '\000' < "$f" | LC_ALL=C wc -c)" -ne "$(LC_ALL=C wc -c < "$f")" ]; then
+                          fail "contains a NUL byte. Use plain text (printable ASCII)."
+                      fi
+                      n=0 inblock=false seen=,
+                      while IFS= read -r line || [ -n "$line" ]; do
+                          n=$((n + 1))
+                          line="${line%$'\r'}" # CRLF files work
+                          if [ -n "$(printf '%s' "$line" | LC_ALL=C tr -d ' -~')" ]; then
+                              fail "line $n: has a tab, a control character or a non-ASCII byte. Use spaces and plain text (printable ASCII)."
+                          fi
+                          trimmed=$(ltrim "$line")
+                          [ -n "$trimmed" ] || continue
+                          case "$trimmed" in '#'*) continue ;; esac
+                          if [ "${line:0:1}" != " " ]; then
+                              [ "$(rtrim "$line")" = "/*" ] || fail "line $n: only the /* block is supported (one set of headers for the whole site)."
+                              inblock=true
+                              continue
+                          fi
+                          $inblock || fail "line $n: a header line must come after a /* line."
+                          case "$trimmed" in *:*) ;; *) fail "line $n: isn't a 'Name: value' header line." ;; esac
+                          name=$(rtrim "${trimmed%%:*}")
+                          value=$(rtrim "$(ltrim "${trimmed#*:}")")
+                          case "$(printf '%s' "$name" | LC_ALL=C tr '[:upper:]' '[:lower:]')" in
+                              content-security-policy) key=csp canon=Content-Security-Policy ;;
+                              content-security-policy-report-only) key=cspro canon=Content-Security-Policy-Report-Only ;;
+                              permissions-policy) key=pp canon=Permissions-Policy ;;
+                              cross-origin-opener-policy) key=coop canon=Cross-Origin-Opener-Policy ;;
+                              cross-origin-resource-policy) key=corp canon=Cross-Origin-Resource-Policy ;;
+                              x-frame-options) key=xfo canon=X-Frame-Options ;;
+                              strict-transport-security) key=hsts canon=Strict-Transport-Security ;;
+                              x-content-type-options) key=nosniff canon=X-Content-Type-Options ;;
+                              referrer-policy) key=referrer canon=Referrer-Policy ;;
+                              *) fail "line $n: that header isn't one Cloud sets from _headers. Allowed: Content-Security-Policy, Content-Security-Policy-Report-Only, Permissions-Policy, Cross-Origin-Opener-Policy, Cross-Origin-Resource-Policy, X-Frame-Options, Strict-Transport-Security, X-Content-Type-Options, Referrer-Policy." ;;
+                          esac
+                          case "$seen" in *",$key,"*) fail "line $n: $canon appears more than once." ;; esac
+                          seen="$seen$key,"
+                          [ -n "$value" ] || fail "line $n: $canon has no value."
+                          case "$key" in
+                              csp | cspro | pp)
+                                  [ "$(printf '%s' "$value" | LC_ALL=C wc -c)" -le 1783 ] || fail "line $n: $canon is over 1,783 bytes (CloudFront's limit)."
+                                  case "$key" in csp) csp=$value ;; cspro) cspro=$value ;; pp) pp=$value ;; esac
+                                  ;;
+                              coop)
+                                  case "$value" in same-origin | same-origin-allow-popups | noopener-allow-popups | unsafe-none) coop=$value ;;
+                                      *) fail "line $n: Cross-Origin-Opener-Policy must be one of same-origin, same-origin-allow-popups, noopener-allow-popups, unsafe-none." ;; esac
+                                  ;;
+                              corp)
+                                  case "$value" in same-origin | same-site | cross-origin) corp=$value ;;
+                                      *) fail "line $n: Cross-Origin-Resource-Policy must be one of same-origin, same-site, cross-origin." ;; esac
+                                  ;;
+                              xfo)
+                                  case "$value" in DENY) xfo=DENY ;; SAMEORIGIN) ;;
+                                      *) fail "line $n: X-Frame-Options can only be DENY, or SAMEORIGIN (the platform's)." ;; esac
+                                  ;;
+                              hsts)
+                                  case "$value" in 'max-age=63072000') ;; 'max-age=63072000; includeSubDomains') sub=true ;;
+                                      *) fail "line $n: Strict-Transport-Security must be exactly max-age=63072000, optionally with ; includeSubDomains (no preload, no other max-age)." ;; esac
+                                  ;;
+                              nosniff) [ "$value" = nosniff ] || fail "line $n: X-Content-Type-Options can only be nosniff (the platform's)." ;;
+                              referrer) [ "$value" = strict-origin-when-cross-origin ] || fail "line $n: Referrer-Policy can only be strict-origin-when-cross-origin (the platform's)." ;;
+                          esac
+                      done < "$f"
+                  fi
+                  # END headers-parse
+                  {
+                      echo "csp=$csp"
+                      echo "csp_report_only=$cspro"
+                      echo "permissions_policy=$pp"
+                      echo "coop=$coop"
+                      echo "corp=$corp"
+                      echo "hsts_include_subdomains=$sub"
+                      echo "frame_options=$xfo"
+                  } >> "$GITHUB_OUTPUT"
+
             - name: Configure AWS credentials via OIDC
               uses: aws-actions/configure-aws-credentials@v4
               with:
@@ -318,6 +420,17 @@ jobs:
                   # (the default until the payload carries it) = no redirect.
                   CANONICAL_HOST: ${{ fromJson(inputs.payload).canonical_host }}
                   ROUTING_MODE: ${{ steps.out.outputs.routing }}
+                  # cloud ADR 0028 D10 — the site's headers from this build's
+                  # _headers (validated above), on top of the platform floor
+                  # in the template. NON_PRODUCTION is Cloud's tier.
+                  CSP: ${{ steps.headersfile.outputs.csp }}
+                  CSP_REPORT_ONLY: ${{ steps.headersfile.outputs.csp_report_only }}
+                  PERMISSIONS_POLICY: ${{ steps.headersfile.outputs.permissions_policy }}
+                  COOP: ${{ steps.headersfile.outputs.coop }}
+                  CORP: ${{ steps.headersfile.outputs.corp }}
+                  HSTS_INCLUDE_SUBDOMAINS: ${{ steps.headersfile.outputs.hsts_include_subdomains }}
+                  FRAME_OPTIONS: ${{ steps.headersfile.outputs.frame_options }}
+                  NON_PRODUCTION: ${{ fromJson(inputs.payload).non_production }}
               run: |
                   set -euo pipefail
                   created=false
@@ -390,6 +503,32 @@ jobs:
                           spa|static) ;;
                           *) echo "::error::Routing mode '${ROUTING_MODE:-}' is not spa or static." >&2; exit 1 ;;
                       esac
+                      # Defense in depth: Cloud validated these before dispatch (D10).
+                      # A payload without them is from an older Cloud: refuse rather
+                      # than deploy production as indexable or the headers as blank.
+                      # BEGIN header-check
+                      headers_ok=true
+                      for v in "${CSP:-}" "${CSP_REPORT_ONLY:-}" "${PERMISSIONS_POLICY:-}"; do
+                          # One line of printable ASCII, at most 1,783 bytes. Counts bytes
+                          # outside ' '..'~' (C locale), so a newline counts too; grep, being
+                          # line-based, wouldn't see one.
+                          len=$(printf '%s' "$v" | LC_ALL=C wc -c)
+                          bad=$(printf '%s' "$v" | LC_ALL=C tr -d ' -~' | LC_ALL=C wc -c)
+                          if [ $((len)) -gt 1783 ] || [ $((bad)) -ne 0 ]; then
+                              headers_ok=false
+                          fi
+                      done
+                      case "${COOP:-}" in ''|same-origin|same-origin-allow-popups|noopener-allow-popups|unsafe-none) ;; *) headers_ok=false ;; esac
+                      case "${CORP:-}" in ''|same-origin|same-site|cross-origin) ;; *) headers_ok=false ;; esac
+                      case "${FRAME_OPTIONS:-}" in SAMEORIGIN|DENY) ;; *) headers_ok=false ;; esac
+                      for b in "${HSTS_INCLUDE_SUBDOMAINS:-}" "${NON_PRODUCTION:-}"; do
+                          case "$b" in true|false) ;; *) headers_ok=false ;; esac
+                      done
+                      if [ "$headers_ok" != true ]; then
+                          echo "::error::[adr-0028] This deploy's security headers are missing or malformed (_headers, or the payload's non_production from an older Cloud). Deploy again from Cloud." >&2
+                          exit 1
+                      fi
+                      # END header-check
                       aws cloudformation deploy \
                           --stack-name "$STACK" \
                           --template-file cloudformation/infrastructure.yml \
@@ -397,7 +536,38 @@ jobs:
                           --no-fail-on-empty-changeset \
                           --parameter-overrides "ProjectSlug=${slug}" "EnvironmentName=${STAGE}" "NamePrefix=${NAME_PREFIX}" \
                               "AcmCertificateArn=${CERT_ARN:-}" "DomainAliases=${DOMAIN_ALIASES:-}" \
-                              "RoutingMode=${ROUTING_MODE}" "CanonicalHost=${CANONICAL_HOST:-}"
+                              "RoutingMode=${ROUTING_MODE}" "CanonicalHost=${CANONICAL_HOST:-}" \
+                              "ContentSecurityPolicy=${CSP:-}" "ContentSecurityPolicyReportOnly=${CSP_REPORT_ONLY:-}" \
+                              "PermissionsPolicy=${PERMISSIONS_POLICY:-}" "CrossOriginOpenerPolicy=${COOP:-}" "CrossOriginResourcePolicy=${CORP:-}" \
+                              "HstsIncludeSubdomains=${HSTS_INCLUDE_SUBDOMAINS}" "FrameOptions=${FRAME_OPTIONS}" \
+                              "NonProduction=${NON_PRODUCTION}"
+                      # BEGIN effective-headers
+                      # For the run_completed callback (ADR 0028 D10): the headers this deploy CONFIGURED (from
+                      # its inputs and the template's NoIndex rule, not a read of the live response), the platform floor
+                      # as "default" and _headers' as "file", with X-Robots-Tag when the template's
+                      # NoIndex holds (the same three conditions). A file, not GITHUB_ENV: no repo code runs
+                      # after this step, and nothing here becomes an env var.
+                      noindex=false
+                      if [ "$NON_PRODUCTION" = true ] || [ -z "${CERT_ARN:-}" ] || [ -z "${CANONICAL_HOST:-}" ]; then
+                          noindex=true
+                      fi
+                      jq -nc \
+                          --arg sub "$HSTS_INCLUDE_SUBDOMAINS" --arg xfo "$FRAME_OPTIONS" --arg noindex "$noindex" \
+                          --arg csp "${CSP:-}" --arg cspro "${CSP_REPORT_ONLY:-}" --arg pp "${PERMISSIONS_POLICY:-}" --arg coop "${COOP:-}" --arg corp "${CORP:-}" '
+                          def opt($n; $v): if $v == "" then empty else {name: $n, value: $v, source: "file"} end;
+                          [ {name: "Strict-Transport-Security", value: ("max-age=63072000" + (if $sub == "true" then "; includeSubDomains" else "" end)), source: (if $sub == "true" then "file" else "default" end)},
+                            {name: "X-Content-Type-Options", value: "nosniff", source: "default"},
+                            {name: "Referrer-Policy", value: "strict-origin-when-cross-origin", source: "default"},
+                            {name: "X-Frame-Options", value: $xfo, source: (if $xfo == "DENY" then "file" else "default" end)},
+                            opt("Content-Security-Policy"; $csp),
+                            opt("Content-Security-Policy-Report-Only"; $cspro),
+                            opt("Permissions-Policy"; $pp),
+                            opt("Cross-Origin-Opener-Policy"; $coop),
+                            opt("Cross-Origin-Resource-Policy"; $corp),
+                            (if $noindex == "true" then {name: "X-Robots-Tag", value: "noindex, nofollow", source: "default"} else empty end) ]
+                          | {kind: "configured", items: .}' \
+                          > "$RUNNER_TEMP/cloud-effective-headers.json"
+                      # END effective-headers
                   else
                       STACK="cloud-${CLOUD_PROJECT_SLUG}-${STAGE}"
                   fi
@@ -435,7 +605,11 @@ jobs:
               run: |
                   set -euo pipefail
                   echo "Syncing $BUILD_DIR to s3://$BUCKET"
-                  aws s3 sync "$BUILD_DIR" "s3://$BUCKET" --delete --no-progress
+                  # _headers and _redirects are configuration, never served (as Netlify and Cloudflare strip
+                  # them; ADR 0028 D10). --exclude also keeps --delete off them, so remove any earlier copy.
+                  aws s3 sync "$BUILD_DIR" "s3://$BUCKET" --delete --no-progress --exclude "_headers" --exclude "_redirects"
+                  aws s3 rm "s3://$BUCKET/_headers" --only-show-errors
+                  aws s3 rm "s3://$BUCKET/_redirects" --only-show-errors
                   # BEGIN metadata-images
                   find "$BUILD_DIR" -type f ! -name '*.*' \( \
                       -name opengraph-image -o -name 'opengraph-image-*' -o \
@@ -537,6 +711,13 @@ jobs:
                       failure_step=null
                       failure_summary=null
                   fi
+                  # cloud ADR 0028 D10: the security headers a static site's stack update configured (not a
+                  # read of the live site), written by that step (react-spa only); otherwise null, and Cloud
+                  # shows none for this run.
+                  headers=null
+                  if [ -s "${RUNNER_TEMP:-/nonexistent}/cloud-effective-headers.json" ] && jq -e 'type == "object" and .kind == "configured" and (.items | type) == "array"' "$RUNNER_TEMP/cloud-effective-headers.json" >/dev/null 2>&1; then
+                      headers=$(jq -c . "$RUNNER_TEMP/cloud-effective-headers.json")
+                  fi
                   payload=$(jq -nc \
                       --arg run_id           "$RUN_ID" \
                       --arg status           "$outcome" \
@@ -547,7 +728,8 @@ jobs:
                       --arg site_url         "${SITE_URL:-}" \
                       --argjson failure_step    "$([ "$failure_step"    = null ] && echo null || jq -Rn --arg s "$failure_step"    '$s')" \
                       --argjson failure_summary "$([ "$failure_summary" = null ] && echo null || jq -Rn --arg s "$failure_summary" '$s')" \
-                      '{run_id:$run_id, status:$status, git_sha:$git_sha, started_at:$started_at, finished_at:$finished_at, provider_run_url:$provider_run_url, failure_step:$failure_step, failure_summary:$failure_summary, site_url:(if $site_url == "" then null else $site_url end)}')
+                      --argjson headers         "$headers" \
+                      '{run_id:$run_id, status:$status, git_sha:$git_sha, started_at:$started_at, finished_at:$finished_at, provider_run_url:$provider_run_url, failure_step:$failure_step, failure_summary:$failure_summary, site_url:(if $site_url == "" then null else $site_url end), headers:$headers}')
                   sig=$(printf '%s' "$payload" | openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" -hex | awk '{print $2}')
                   # Per-org route (admin ADR 0045 D3; VerifyOrgWebhookHmac).
                   if ! curl -fsS -X POST "$api_base/plugins/cloud/webhooks/$WEBHOOK_ORG/run_completed" \
