@@ -212,6 +212,8 @@ Resources:
                         AccessControlMaxAgeSec: 63072000
                         IncludeSubdomains: !Ref HstsIncludeSubdomains
                         # No preload: it's hard to undo, so a repo file can't turn it on (cloud PR 293).
+                        # The Rules assertion (preload needs includeSubDomains) was removed because this
+                        # is hardcoded. Restoring a Preload parameter needs the assertion back.
                         Preload: false
                         Override: true
                     ContentTypeOptions:

@@ -540,7 +540,8 @@ jobs:
                               "HstsIncludeSubdomains=${HSTS_INCLUDE_SUBDOMAINS}" "FrameOptions=${FRAME_OPTIONS}" \
                               "NonProduction=${NON_PRODUCTION}"
                       # BEGIN effective-headers
-                      # For the run_completed callback (ADR 0028 D10): the headers now live, the platform floor
+                      # For the run_completed callback (ADR 0028 D10): the headers this deploy CONFIGURED (from
+                      # its inputs and the template's NoIndex rule, not a read of the live response), the platform floor
                       # as "default" and _headers' as "file", with X-Robots-Tag when the template's
                       # NoIndex holds (the same three conditions). A file, not GITHUB_ENV: no repo code runs
                       # after this step, and nothing here becomes an env var.
@@ -561,7 +562,8 @@ jobs:
                             opt("Permissions-Policy"; $pp),
                             opt("Cross-Origin-Opener-Policy"; $coop),
                             opt("Cross-Origin-Resource-Policy"; $corp),
-                            (if $noindex == "true" then {name: "X-Robots-Tag", value: "noindex, nofollow", source: "default"} else empty end) ]' \
+                            (if $noindex == "true" then {name: "X-Robots-Tag", value: "noindex, nofollow", source: "default"} else empty end) ]
+                          | {kind: "configured", items: .}' \
                           > "$RUNNER_TEMP/cloud-effective-headers.json"
                       # END effective-headers
                   else
@@ -707,10 +709,11 @@ jobs:
                       failure_step=null
                       failure_summary=null
                   fi
-                  # cloud ADR 0028 D10: the security headers a static site's stack update applied, written
-                  # by that step (react-spa only); otherwise null, and Cloud shows none for this run.
+                  # cloud ADR 0028 D10: the security headers a static site's stack update configured (not a
+                  # read of the live site), written by that step (react-spa only); otherwise null, and Cloud
+                  # shows none for this run.
                   headers=null
-                  if [ -s "${RUNNER_TEMP:-/nonexistent}/cloud-effective-headers.json" ] && jq -e 'type == "array"' "$RUNNER_TEMP/cloud-effective-headers.json" >/dev/null 2>&1; then
+                  if [ -s "${RUNNER_TEMP:-/nonexistent}/cloud-effective-headers.json" ] && jq -e 'type == "object" and .kind == "configured" and (.items | type) == "array"' "$RUNNER_TEMP/cloud-effective-headers.json" >/dev/null 2>&1; then
                       headers=$(jq -c . "$RUNNER_TEMP/cloud-effective-headers.json")
                   fi
                   payload=$(jq -nc \
