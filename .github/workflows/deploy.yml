@@ -320,6 +320,10 @@ jobs:
                       if [ "$(LC_ALL=C wc -c < "$f")" -gt 65536 ]; then
                           fail "is over 64 KiB."
                       fi
+                      # bash's read drops NUL bytes silently (QA on cloud PR 292), so compare the byte counts.
+                      if [ "$(LC_ALL=C tr -d '\000' < "$f" | LC_ALL=C wc -c)" -ne "$(LC_ALL=C wc -c < "$f")" ]; then
+                          fail "contains a NUL byte. Use plain text (printable ASCII)."
+                      fi
                       n=0 inblock=false seen=,
                       while IFS= read -r line || [ -n "$line" ]; do
                           n=$((n + 1))
@@ -704,7 +708,7 @@ jobs:
                       failure_summary=null
                   fi
                   # cloud ADR 0028 D10: the security headers a static site's stack update applied, written
-                  # by that step (react-spa only); otherwise null, and Cloud keeps the last deploy's set.
+                  # by that step (react-spa only); otherwise null, and Cloud shows none for this run.
                   headers=null
                   if [ -s "${RUNNER_TEMP:-/nonexistent}/cloud-effective-headers.json" ] && jq -e 'type == "array"' "$RUNNER_TEMP/cloud-effective-headers.json" >/dev/null 2>&1; then
                       headers=$(jq -c . "$RUNNER_TEMP/cloud-effective-headers.json")
