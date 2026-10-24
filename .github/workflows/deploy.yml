@@ -119,7 +119,12 @@ jobs:
     # no secrets, no environment.
     validate:
         runs-on: ubuntu-latest
-        permissions: {}
+        # Read the repository's history for the on-branch check below (cloud ADR 0018 D4a); nothing else.
+        permissions:
+            contents: read
+        outputs:
+            # The commit every later job checks out (cloud ADR 0018 D4a).
+            sha: ${{ steps.resolve.outputs.sha }}
         steps:
             - name: Validate the stage name
               env:
@@ -134,6 +139,41 @@ jobs:
                       exit 1
                   fi
     # END validate-stage
+    # BEGIN resolve-commit
+            # cloud ADR 0018 D4a: build the commit Cloud asked for. Rollback and Redeploy send the SHA of an
+            # earlier successful run as the payload's `sha`; a normal deploy or a push sends "" for the branch
+            # head. A SHA is used only if it is a full commit id AND on this branch (an ancestor of the
+            # dispatched head), so nothing off the branch (an unmerged PR, a fork-only commit) can reach this
+            # environment's AWS role and secrets. This job runs no code from the repository, and every job that
+            # does, and every AWS credential, comes after it (`needs: validate`) and checks out its output.
+            - name: Checkout the branch history (for the on-branch check)
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+                  persist-credentials: false
+            - name: Resolve the commit to build
+              id: resolve
+              env:
+                  PAYLOAD_SHA: ${{ fromJson(inputs.payload).sha }}
+              run: |
+                  set -euo pipefail
+                  sha="${PAYLOAD_SHA:-}"
+                  if [ -z "$sha" ]; then
+                      # No commit asked for: the branch head this run was dispatched on.
+                      echo "sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+                      exit 0
+                  fi
+                  # The whole value, lowercase 40 hex: anything else (HEAD, a short id, a ref name) refuses.
+                  if ! [[ "$sha" =~ ^[0-9a-f]{40}$ ]]; then
+                      echo "::error::Cloud asked for a commit that isn't a full commit id, so nothing was deployed." >&2
+                      exit 1
+                  fi
+                  if ! git merge-base --is-ancestor "$sha" "$GITHUB_SHA" 2>/dev/null; then
+                      echo "::error::That commit is not on ${GITHUB_REF_NAME}, so it can't be deployed to this environment." >&2
+                      exit 1
+                  fi
+                  echo "sha=$sha" >> "$GITHUB_OUTPUT"
+    # END resolve-commit
 
     deploy:
         needs: validate
@@ -178,6 +218,8 @@ jobs:
 
             - name: Checkout
               uses: actions/checkout@v4
+              with:
+                  ref: ${{ needs.validate.outputs.sha }}
 
             # Capture the runner's start time for the run_completed
             # webhook payload's `started_at` field. Admin's deploy
@@ -686,7 +728,8 @@ jobs:
                   WEBHOOK_URL:    ${{ vars.ADMIN_WEBHOOK_URL }}
                   WEBHOOK_ORG:    ${{ fromJson(inputs.payload).webhook_org }}
                   RUN_ID:         ${{ fromJson(inputs.payload).run_id }}
-                  GIT_SHA:        ${{ github.sha }}
+                  # The commit this run built (cloud ADR 0018 D4a), not the branch head it was dispatched on.
+                  GIT_SHA:        ${{ needs.validate.outputs.sha }}
                   RUN_URL:        ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
                   JOB_STATUS:     ${{ job.status }}
                   STARTED_AT:     ${{ env.DEPLOY_STARTED_AT }}
