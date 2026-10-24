@@ -78,12 +78,87 @@ Parameters:
         AllowedPattern: '^([a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+)?$'
         MaxLength: 253
 
+    # cloud ADR 0028 D10 (rewritten 2026-10-24): the site's headers come from a
+    # `_headers` file in its build output, read and validated by the deploy
+    # workflow, on top of the platform floor below, which they can only tighten.
+    # The workflow passes all of them on every deploy; these limits back up its check.
+    ContentSecurityPolicy:
+        Type: String
+        Default: ''
+        Description: Optional. The Content-Security-Policy value. Blank = no header.
+        AllowedPattern: '^[ -~]*$'
+        MaxLength: 1783
+
+    ContentSecurityPolicyReportOnly:
+        Type: String
+        Default: ''
+        Description: Optional. The Content-Security-Policy-Report-Only value. Blank = no header.
+        AllowedPattern: '^[ -~]*$'
+        MaxLength: 1783
+
+    PermissionsPolicy:
+        Type: String
+        Default: ''
+        Description: Optional. The Permissions-Policy value. Blank = no header.
+        AllowedPattern: '^[ -~]*$'
+        MaxLength: 1783
+
+    CrossOriginOpenerPolicy:
+        Type: String
+        Default: ''
+        Description: Optional. Blank = no header. same-origin breaks sign-in and payment popups.
+        AllowedValues: ['', same-origin, same-origin-allow-popups, noopener-allow-popups, unsafe-none]
+
+    CrossOriginResourcePolicy:
+        Type: String
+        Default: ''
+        Description: Optional. Blank = no header. same-origin stops other sites embedding this one's files.
+        AllowedValues: ['', same-origin, same-site, cross-origin]
+
+    HstsIncludeSubdomains:
+        Type: String
+        Default: 'false'
+        AllowedValues: ['false', 'true']
+
+    FrameOptions:
+        Type: String
+        Default: SAMEORIGIN
+        AllowedValues: [SAMEORIGIN, DENY]
+        Description: SAMEORIGIN (the floor) or DENY. Nothing weaker can be expressed.
+
+    NonProduction:
+        Type: String
+        Default: 'true'
+        AllowedValues: ['true', 'false']
+        Description: >-
+            Derived by Cloud from the environment's tier, never input. A stack
+            applied without it counts as non-production, so it isn't indexed.
+
+Rules:
+    # Without a canonical host, NoIndex holds: production on its own domain would be
+    # hidden from search engines. Refuse before any stack update (Cloud refuses first).
+    ProductionDomainNeedsCanonicalHost:
+        RuleCondition: !And [!Equals [!Ref NonProduction, 'false'], !Not [!Equals [!Ref AcmCertificateArn, '']]]
+        Assertions:
+            - Assert: !Not [!Equals [!Ref CanonicalHost, '']]
+              AssertDescription: A production environment with a custom domain needs CanonicalHost, or it would be served with noindex.
+
 Conditions:
     HasCustomDomain: !Not [!Equals [!Ref AcmCertificateArn, '']]
     HasNamePrefix: !Not [!Equals [!Ref NamePrefix, '']]
     IsStaticRouting: !Equals [!Ref RoutingMode, static]
     HasCanonicalHost: !Not [!Equals [!Ref CanonicalHost, '']]
     NeedsViewerFunction: !Or [!Condition IsStaticRouting, !Condition HasCanonicalHost]
+    HasCsp: !Not [!Equals [!Ref ContentSecurityPolicy, '']]
+    HasCspReportOnly: !Not [!Equals [!Ref ContentSecurityPolicyReportOnly, '']]
+    HasPermissionsPolicy: !Not [!Equals [!Ref PermissionsPolicy, '']]
+    HasCoop: !Not [!Equals [!Ref CrossOriginOpenerPolicy, '']]
+    HasCorp: !Not [!Equals [!Ref CrossOriginResourcePolicy, '']]
+    IsNonProduction: !Equals [!Ref NonProduction, 'true']
+    # ADR 0028 D10: noindex unless production with its own domain and a
+    # canonical host (which sends *.cloudfront.net and the apex to that host).
+    NoIndex: !Or [!Condition IsNonProduction, !Not [!Condition HasCustomDomain], !Not [!Condition HasCanonicalHost]]
+    HasCustomHeaders: !Or [!Condition HasCspReportOnly, !Condition HasPermissionsPolicy, !Condition HasCoop, !Condition HasCorp, !Condition NoIndex]
 
 Resources:
     AssetsBucket:
@@ -117,11 +192,12 @@ Resources:
                 SigningBehavior: always
                 SigningProtocol: sigv4
 
-    # HSTS for two years (the managed SecurityHeadersPolicy sends one year),
-    # plus the managed policy's other headers unchanged. This is NOT the
-    # header set a site may have had on Vercel: there is no
-    # Content-Security-Policy, Permissions-Policy, COOP or CORP, frames are
-    # SAMEORIGIN, and nothing here is per-app yet.
+    # The platform floor (ADR 0028 D10): HSTS for two years, nosniff,
+    # Referrer-Policy, frames SAMEORIGIN, and X-Robots-Tag per NoIndex. The site's
+    # _headers may add CSP, CSP-Report-Only, Permissions-Policy, COOP and
+    # CORP, and tighten HSTS (includeSubDomains) and frames (DENY); nothing can
+    # loosen the floor. No preload, and no X-XSS-Protection (deprecated, and its
+    # filter was an XSS vector).
     ResponseHeaders:
         Type: AWS::CloudFront::ResponseHeadersPolicy
         Properties:
@@ -134,21 +210,59 @@ Resources:
                 SecurityHeadersConfig:
                     StrictTransportSecurity:
                         AccessControlMaxAgeSec: 63072000
-                        IncludeSubdomains: false
+                        IncludeSubdomains: !Ref HstsIncludeSubdomains
+                        # No preload: it's hard to undo, so a repo file can't turn it on (cloud PR 293).
                         Preload: false
                         Override: true
                     ContentTypeOptions:
                         Override: true
                     FrameOptions:
-                        FrameOption: SAMEORIGIN
+                        FrameOption: !Ref FrameOptions
                         Override: false
                     ReferrerPolicy:
                         ReferrerPolicy: strict-origin-when-cross-origin
-                        Override: false
-                    XSSProtection:
-                        Protection: true
-                        ModeBlock: true
-                        Override: false
+                        Override: true
+                    ContentSecurityPolicy: !If
+                        - HasCsp
+                        - ContentSecurityPolicy: !Ref ContentSecurityPolicy
+                          Override: true
+                        - !Ref 'AWS::NoValue'
+                # SecurityHeadersConfig can't send Report-Only. CloudFront
+                # refuses an empty Items list, hence the outer !If.
+                CustomHeadersConfig: !If
+                    - HasCustomHeaders
+                    - Items:
+                          - !If
+                            - HasCspReportOnly
+                            - Header: Content-Security-Policy-Report-Only
+                              Value: !Ref ContentSecurityPolicyReportOnly
+                              Override: true
+                            - !Ref 'AWS::NoValue'
+                          - !If
+                            - HasPermissionsPolicy
+                            - Header: Permissions-Policy
+                              Value: !Ref PermissionsPolicy
+                              Override: true
+                            - !Ref 'AWS::NoValue'
+                          - !If
+                            - HasCoop
+                            - Header: Cross-Origin-Opener-Policy
+                              Value: !Ref CrossOriginOpenerPolicy
+                              Override: true
+                            - !Ref 'AWS::NoValue'
+                          - !If
+                            - HasCorp
+                            - Header: Cross-Origin-Resource-Policy
+                              Value: !Ref CrossOriginResourcePolicy
+                              Override: true
+                            - !Ref 'AWS::NoValue'
+                          - !If
+                            - NoIndex
+                            - Header: X-Robots-Tag
+                              Value: 'noindex, nofollow'
+                              Override: true
+                            - !Ref 'AWS::NoValue'
+                    - !Ref 'AWS::NoValue'
 
     # Viewer-request routing. Only created when needed (static routing or a
     # canonical host), so an SPA stack with no domain is unchanged. Plain ES5
