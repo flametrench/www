@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CheckCircle2, FileJson2, Shield, GitBranch } from "lucide-react";
+import { pageOpenGraph } from "@/lib/metadata";
 
 export const metadata: Metadata = {
   title: "Conformance",
   description:
     "How Flametrench SDKs are verified: language-agnostic JSON fixtures, RFC 2119 levels, spec-linked, drift-checked in CI.",
+  openGraph: pageOpenGraph("/docs/conformance/"),
 };
 
 export default function ConformancePage() {

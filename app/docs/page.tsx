@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { pageOpenGraph } from "@/lib/metadata";
 
 export const metadata: Metadata = {
   title: "Documentation",
   description: "Flametrench specification and SDK reference.",
+  openGraph: pageOpenGraph("/docs/"),
 };
 
 export default function DocsIndex() {
@@ -13,7 +15,7 @@ export default function DocsIndex() {
         Documentation
       </p>
       <h1 className="mt-2 text-4xl font-semibold tracking-tight">
-        Flametrench v0.2
+        Flametrench v0.3
       </h1>
       <p className="mt-5 text-[color:var(--color-fg-muted)]">
         This is the documentation for the Flametrench specification and the
@@ -79,7 +81,7 @@ export default function DocsIndex() {
           >
             Architecture Decision Records
           </Link>{" "}
-          — the why behind every load-bearing choice across v0.1 and v0.2.
+          — the why behind every load-bearing choice across v0.1, v0.2, and v0.3.
         </li>
         <li>
           <Link
@@ -90,7 +92,7 @@ export default function DocsIndex() {
           >
             Reference Postgres schema
           </Link>{" "}
-          — non-normative DDL that encodes the current data model (v0.1 + v0.2).
+          — non-normative DDL that encodes the current data model (v0.1 + v0.2 + v0.3).
         </li>
         <li>
           <Link
@@ -101,7 +103,26 @@ export default function DocsIndex() {
           >
             OpenAPI specification
           </Link>{" "}
-          — the HTTP contract every conforming server exposes.
+          — the HTTP contract every conforming server exposes. The v0.1 base
+          composes additively with the{" "}
+          <Link
+            href="https://github.com/flametrench/spec/blob/main/openapi/flametrench-v0.2-additions.yaml"
+            className="text-[color:var(--color-accent)] hover:underline"
+            target="_blank"
+            rel="noreferrer"
+          >
+            v0.2
+          </Link>{" "}
+          and{" "}
+          <Link
+            href="https://github.com/flametrench/spec/blob/main/openapi/flametrench-v0.3-additions.yaml"
+            className="text-[color:var(--color-accent)] hover:underline"
+            target="_blank"
+            rel="noreferrer"
+          >
+            v0.3
+          </Link>{" "}
+          additions; bundle all three for the complete v0.3 contract.
         </li>
       </ul>
 
@@ -114,15 +135,22 @@ export default function DocsIndex() {
         <li>Organization metadata (name + slug) and invitation acceptance binding (security).</li>
       </ul>
 
-      <h2 className="mt-12 text-xl font-semibold">Coming in v0.3+</h2>
+      <h2 className="mt-12 text-xl font-semibold">In v0.3</h2>
       <ul className="mt-4 space-y-2 text-sm text-[color:var(--color-fg-muted)]">
-        <li>Admin UI reference implementation.</li>
-        <li>Audit events (<code>aud_</code>), notifications (<code>not_</code>), file metadata (<code>file_</code>).</li>
-        <li>Feature flags (<code>flag_</code>) and billing hooks (<code>sub_</code>).</li>
-        <li>Magic-link and SAML credential types.</li>
-        <li>Nested organizations.</li>
-        <li>Additional language SDKs as adopter demand emerges.</li>
+        <li>Personal access tokens (ADR 0016).</li>
+        <li>Postgres-backed rewrite-rule evaluation (ADR 0017).</li>
+        <li>Go SDK family — the fifth language (ADR 0018).</li>
       </ul>
+
+      <h2 className="mt-12 text-xl font-semibold">What&apos;s next</h2>
+      <ul className="mt-4 space-y-2 text-sm text-[color:var(--color-fg-muted)]">
+        <li>v0.4 (awaiting spec decisions): audit (<code>aud_</code>), notifications (<code>not_</code>), file metadata (<code>file_</code>), feature flags (<code>flag_</code>). SDK packages are published at 0.4.0 ahead of ratification.</li>
+        <li>A black-box conformance runner, so any backend can prove it behaves identically over the wire (planned).</li>
+      </ul>
+      <p className="mt-4 text-sm text-[color:var(--color-fg-muted)]">
+        New capabilities enter the spec only by owner decision, proven first by
+        a real adopter.
+      </p>
 
       <p className="mt-12 text-sm text-[color:var(--color-fg-faint)]">
         Track progress or open a discussion at{" "}

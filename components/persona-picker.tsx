@@ -119,7 +119,7 @@ const PERSONAS: Persona[] = [
       "Your sign-in views or templates — only the underlying primitives",
     ],
     pitch: [
-      "django-guardian's per-object permissions get you most of the way to Flametrench's tuple model. The difference: Flametrench is conformance-tested across four SDKs, so the same authz semantics work whether the call site is Django, FastAPI, or a Node service.",
+      "django-guardian's per-object permissions get you most of the way to Flametrench's tuple model. The difference: Flametrench shares one conformance suite across five SDKs, so the same authz semantics work whether the call site is Django, FastAPI, or a Node service.",
       "Postgres-backed stores use psycopg directly — no ORM, no Django framework dependency. Drop them into any Python service. Argon2id is pinned at the OWASP floor and byte-identical across all five SDK families.",
     ],
     cta: { label: "Read the Python SDK docs →", href: "https://github.com/flametrench/authz-python" },
