@@ -403,6 +403,15 @@ Resources:
                         ResponseCode: 200
                         ResponsePagePath: /index.html
                         ErrorCachingMinTTL: 10
+            # 17tvpau6cka: the distribution names its owner, so the CFN service role (cloud-app-role) may change only
+            # distributions tagged with its own prefix. The value is only the validated NamePrefix (the same base as
+            # the bucket, OAC and policy names), never free input; a fresh stack creates it with the tag.
+            Tags:
+                - Key: cloud:front-owner
+                  Value: !If
+                      - HasNamePrefix
+                      - !Ref NamePrefix
+                      - !Sub 'cloud-${ProjectSlug}-${EnvironmentName}'
 
     AssetsBucketPolicy:
         Type: AWS::S3::BucketPolicy
