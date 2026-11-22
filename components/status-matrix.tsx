@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CheckCircle2, Clock, Circle } from "lucide-react";
 import { Container } from "./container";
+import { SPEC_VERSION } from "@/lib/spec-version";
 
 // Status matrix: package × language × version × channel state.
 // Replaces the SDK-grid framing because adopters want the precise
@@ -38,11 +39,11 @@ const ROWS: Row[] = [
     pkg: "ids",
     blurb: "Wire-format identifiers (UUIDv7, prefixed).",
     cells: {
-      node: { version: "v0.3.0", channel: "live" },
-      php: { version: "v0.3.0", channel: "live" },
-      python: { version: "v0.3.0", channel: "live" },
-      java: { version: "v0.3.0", channel: "live" },
-      go: { version: "v0.3.2", channel: "live" },
+      node: { version: "v0.4.0", channel: "live" },
+      php: { version: "v0.4.0", channel: "live" },
+      python: { version: "v0.4.0", channel: "live" },
+      java: { version: "v0.4.0", channel: "live" },
+      go: { version: "v0.4.0", channel: "live" },
     },
   },
   {
@@ -60,11 +61,11 @@ const ROWS: Row[] = [
     pkg: "tenancy",
     blurb: "Organizations, memberships, invitations.",
     cells: {
-      node: { version: "v0.3.0", channel: "live" },
-      php: { version: "v0.3.0", channel: "live" },
-      python: { version: "v0.3.0", channel: "live" },
+      node: { version: "v0.4.0", channel: "live" },
+      php: { version: "v0.4.0", channel: "live" },
+      python: { version: "v0.4.1", channel: "live" },
       java: { version: "v0.3.0", channel: "live" },
-      go: { version: "v0.3.2", channel: "live" },
+      go: { version: "v0.4.0", channel: "live" },
     },
   },
   {
@@ -166,7 +167,7 @@ export function StatusMatrix() {
             Package × language × registry.
           </h2>
           <p className="mt-4 text-[color:var(--color-fg-muted)]">
-            The specification is at <span className="font-medium text-[color:var(--color-fg)]">v0.3.0 · stable</span>. All five SDK families ship the v0.3 contract and are live on their registries — identity is at v0.3.1 on Node and PHP (CWE-208 timing-oracle patch); Java published to Maven Central at v0.3.0.
+            The specification is at <span className="font-medium text-[color:var(--color-fg)]">{SPEC_VERSION} · stable</span>. Package versions below are what&apos;s actually installable on each registry today, independent of spec acceptance — <code>ids</code> and <code>tenancy</code> already publish 0.4.x releases even though the v0.4 spec (ADRs 0019–0022: audit, file metadata, feature flags, notifications) is still Proposed, not accepted.
           </p>
         </div>
 
@@ -230,7 +231,7 @@ export function StatusMatrix() {
 
         <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-[color:var(--color-fg-muted)]">
           <span className="font-mono text-[color:var(--color-fg-faint)] uppercase tracking-wider text-[11px]">
-            Protocol: v0.3.0
+            Protocol: {SPEC_VERSION}
           </span>
           <span className="text-[color:var(--color-border-strong)]" aria-hidden>|</span>
           <span className="inline-flex items-center gap-1">

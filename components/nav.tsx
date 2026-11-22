@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { LogoMark } from "./logo-mark";
 import { Container } from "./container";
+import { SPEC_BADGE } from "@/lib/spec-version";
 
 export function Nav() {
   return (
@@ -15,7 +16,7 @@ export function Nav() {
             <LogoMark size={24} className="text-[color:var(--color-fg)] transition-opacity group-hover:opacity-90" />
             <span className="font-semibold">flametrench</span>
             <span className="rounded border border-[color:var(--color-border)] px-1.5 py-[1px] font-sans text-[10px] uppercase tracking-wider text-[color:var(--color-fg-muted)]">
-              Spec v0.3.0 · stable
+              {SPEC_BADGE}
             </span>
           </Link>
           <nav className="flex items-center gap-6 text-sm text-[color:var(--color-fg-muted)]">

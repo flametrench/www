@@ -39,18 +39,19 @@ const milestones: Array<{
     items: [
       "Personal access tokens (pat_) — long-lived machine credentials (ADR 0016)",
       "Go SDK family — fifth language, full v0.3 parity (ADR 0018)",
-      "Postgres rewrite-rule evaluation — computed_userset and tuple_to_userset in SQL (ADR 0017)",
+      "Postgres rewrite-rule evaluation — PostgresTupleStore gains rule-aware check() (ADR 0017)",
     ],
   },
   {
     version: "v0.4",
-    status: "planned",
-    title: "Observability & extensibility",
+    status: "in-progress",
+    title: "Awaiting spec decisions",
     items: [
-      "Audit events (aud_) — tamper-evident operation log (ADR 0019, in progress)",
-      "Notifications (not_) — delivery hooks for membership and authz events",
-      "File metadata primitive (file_)",
-      "Feature flags (flag_)",
+      "Audit events (aud_) — append-only action log (ADR 0019)",
+      "Notifications (not_) — per-recipient notification records, not a delivery engine (ADR 0022)",
+      "File metadata (file_) — storage-agnostic metadata and lifecycle (ADR 0020)",
+      "Feature flags (flag_) — boolean flags with authz targeting (ADR 0021)",
+      "SDK packages are published at 0.4.0 ahead of ratification; each primitive awaits an owner decision",
     ],
   },
 ];
